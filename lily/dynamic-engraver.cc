@@ -56,6 +56,7 @@ private:
   Stream_event *script_event_;
   Stream_event *current_span_event_;
   bool end_new_spanner_;
+  bool finalized_;
 };
 
 Dynamic_engraver::Dynamic_engraver ()
@@ -67,6 +68,7 @@ Dynamic_engraver::Dynamic_engraver ()
   current_spanner_ = 0;
   accepted_spanevents_drul_.set (0, 0);
   end_new_spanner_ = false;
+  finalized_ = false;
 }
 
 void
@@ -79,6 +81,8 @@ void
 Dynamic_engraver::listen_span_dynamic (Stream_event *ev)
 {
   Direction d = to_dir (ev->get_property ("span-direction"));
+  string id = robust_scm2string (ev->get_property ("spanner-id"), "");
+  debug_output (string("received in ") + (finalized_ ? "finalized" : "not finalized") + " engraver: " + (d == START ? "START" : "STOP") + ", id " + id);
 
   ASSIGN_EVENT_ONCE (accepted_spanevents_drul_[d], ev);
 }
@@ -222,6 +226,7 @@ Dynamic_engraver::stop_translation_timestep ()
 void
 Dynamic_engraver::finalize ()
 {
+  finalized_ = true;
   if (current_spanner_
       && !current_spanner_->is_live ())
     current_spanner_ = 0;
