@@ -17,6 +17,7 @@
   along with LilyPond.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "context.hh"
 #include "engraver.hh"
 #include "hairpin.hh"
 #include "international.hh"
@@ -56,8 +57,11 @@ private:
   Stream_event *script_event_;
   Stream_event *current_span_event_;
   bool end_new_spanner_;
-  bool finalized_;
+
+  // alist: ((<spanner-id string> . (('current-voice . voice) ('spanner . spanner))) () ())
+  static SCM cvspanners_;
 };
+SCM Dynamic_engraver::cvspanners_ = SCM_EOL;
 
 Dynamic_engraver::Dynamic_engraver ()
 {
@@ -68,7 +72,6 @@ Dynamic_engraver::Dynamic_engraver ()
   current_spanner_ = 0;
   accepted_spanevents_drul_.set (0, 0);
   end_new_spanner_ = false;
-  finalized_ = false;
 }
 
 void
@@ -82,7 +85,7 @@ Dynamic_engraver::listen_span_dynamic (Stream_event *ev)
 {
   Direction d = to_dir (ev->get_property ("span-direction"));
   string id = robust_scm2string (ev->get_property ("spanner-id"), "");
-  debug_output (string("received in ") + (finalized_ ? "finalized" : "not finalized") + " engraver: " + (d == START ? "START" : "STOP") + ", id " + id);
+  debug_output (string("received: ") + (d == START ? "START" : "STOP") + ", id " + id);
 
   ASSIGN_EVENT_ONCE (accepted_spanevents_drul_[d], ev);
 }
@@ -132,6 +135,31 @@ Dynamic_engraver::process_music ()
       announce_end_grob (finished_spanner_, ender->self_scm ());
       current_spanner_ = 0;
       current_span_event_ = 0;
+    }
+  else if (accepted_spanevents_drul_[STOP])
+    {
+      debug_output ("checking cross voice");
+      Stream_event *ender = accepted_spanevents_drul_[STOP];
+      SCM ender_id = ender->get_property ("spanner-id");
+      assert (scm_is_string (ender_id));
+      for (SCM s = cvspanners_; scm_is_pair (s); s = scm_cdr (s))
+        {
+	  SCM entry = scm_car (s);
+	  SCM entry_id = scm_car (entry);
+	  bool id_equal = scm_string_eq (entry_id, ender_id, SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED);
+	  debug_output ("checking spanner with id " + ly_scm2string(entry_id));
+	  SCM entry_props = scm_cdr (entry);
+//	  SCM entry_voice = scm_assoc_ref (entry_props, ly_symbol2scm ("current-voice"));
+//	  bool voice_equal = ly_is_equal (context ()->self_scm (), entry_voice);
+	  if (id_equal)
+	    {
+	      // For now, just change the voice when we see the stop event
+	      entry_props = scm_assoc_set_x (entry_props, ly_symbol2scm ("current-voice"), context ()->self_scm ());
+	      SCM span = scm_assoc_ref (entry_props, ly_symbol2scm ("spanner"));
+	      // We got a STOP event for the spanner, so end it
+	      // TODO
+	    }
+	}
     }
 
   if (accepted_spanevents_drul_[START])
@@ -189,6 +217,18 @@ Dynamic_engraver::process_music ()
                                                ly_symbol2scm ("adjacent-spanners"),
                                                finished_spanner_);
         }
+
+      // Add spanner to cvspanners_ in case it ends in another voice
+      SCM spanner_id = current_span_event_->get_property ("spanner-id");
+      string spanner_id_str = robust_scm2string (spanner_id, "");
+      if (spanner_id_str.size() > 0)
+        {
+	  SCM cvprops = SCM_EOL;
+	  cvprops = scm_acons (ly_symbol2scm ("current-voice"), context ()->self_scm (), cvprops);
+	  cvprops = scm_acons (ly_symbol2scm ("spanner"), current_spanner_->self_scm (), cvprops);
+	  // check if exists?
+	  cvspanners_ = scm_acons (spanner_id, cvprops, cvspanners_);
+	}
     }
 
   if (script_event_)
@@ -226,7 +266,6 @@ Dynamic_engraver::stop_translation_timestep ()
 void
 Dynamic_engraver::finalize ()
 {
-  finalized_ = true;
   if (current_spanner_
       && !current_spanner_->is_live ())
     current_spanner_ = 0;

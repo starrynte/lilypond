@@ -63,7 +63,6 @@ Translator_group::connect_to_context (Context *c)
   for (SCM tr_list = simple_trans_list_; scm_is_pair (tr_list); tr_list = scm_cdr (tr_list))
     {
       Translator *tr = unsmob<Translator> (scm_car (tr_list));
-      debug_output ("Connecting " + string (tr->class_name ()) + " to context " + c->context_name ());
       tr->connect_to_context (c);
     }
 }
@@ -205,15 +204,6 @@ Translator_group::create_child_translator (SCM sev)
           instance->daddy_context_ = new_context;
           instance->unprotect ();
         }
-    }
-
-  debug_output ("new_context " + new_context->context_name () + " is score? " + ((new_context == new_context->get_score_context ()) ? "true" : "false"));
-  if (new_context == new_context->get_score_context ())
-    {
-      Translator *dynamic = get_translator (ly_symbol2scm ("Dynamic_engraver"))->clone ();
-      trans_list = scm_cons (dynamic->self_scm (), trans_list);
-      dynamic->daddy_context_ = new_context;
-      dynamic->unprotect ();
     }
 
   /* Filter unwanted translator types. Required to make
