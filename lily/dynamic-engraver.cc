@@ -26,6 +26,7 @@
 #include "pointer-group-interface.hh"
 #include "self-alignment-interface.hh"
 #include "spanner.hh"
+#include "spanner-engraver.hh"
 #include "stream-event.hh"
 #include "text-interface.hh"
 
@@ -58,8 +59,7 @@ private:
   Stream_event *current_span_event_;
   bool end_new_spanner_;
 
-  // alist: ((<spanner-id string> . (('current-voice . voice) ('spanner . spanner))) () ())
-  static SCM cvspanners_;
+  SPANNER_ENGRAVER_DECLARATIONS ();
 };
 SCM Dynamic_engraver::cvspanners_ = SCM_EOL;
 
@@ -102,15 +102,15 @@ Dynamic_engraver::listen_break_span (Stream_event *event)
         end_new_spanner_ = true;
       else if (current_spanner_)
         current_spanner_->set_property ("spanner-broken", SCM_BOOL_T);
-      for (SCM s = cvspanners_; scm_is_pair (s); s = scm_cdr (s))
+
+      SCM id = event->get_property ("spanner-id");
+      SCM entry = GET_CV_ENTRY (id);
+      if (scm_is_pair (entry))
         {
-          SCM entry = scm_cdar (s);
-          if (scm_assoc_ref (entry, ly_symbol2scm ("current-voice")) == context ()->self_scm ())
-            {
-              Spanner *span = unsmob<Spanner> (scm_assoc_ref (entry, ly_symbol2scm ("spanner")));
-              span->set_property ("spanner-broken", SCM_BOOL_T);
-            }
-        }
+	  SET_CV_ENTRY_CONTEXT (id, entry, context ());
+	  Spanner *span = GET_CV_ENTRY_SPANNER (entry);
+	  span->set_property ("spanner-broken", SCM_BOOL_T);
+	}
     }
 }
 
@@ -149,16 +149,14 @@ Dynamic_engraver::process_music ()
     {
       Stream_event *ender = accepted_spanevents_drul_[STOP];
       SCM ender_id = ender->get_property ("spanner-id");
-      assert (scm_is_string (ender_id));
-      SCM entry = scm_assoc_ref (cvspanners_, ender_id);
-      if (scm_is_pair (entry))
+      SCM entry = GET_CV_ENTRY (ender_id);
+      if (scm_is_string (ender_id) && scm_is_pair (entry))
         {
           // We got a STOP event for the spanner, so end it
-          Spanner *span = unsmob<Spanner> (scm_assoc_ref (entry, ly_symbol2scm ("spanner")));
-          finished_spanner_ = span;
+          finished_spanner_ = GET_CV_ENTRY_SPANNER (entry);
           debug_output ("announcing cv spanner");
           announce_end_grob (finished_spanner_, ender->self_scm ());
-          cvspanners_ = scm_assoc_remove_x (cvspanners_, ender_id);
+          DELETE_CV_ENTRY (ender_id);
         }
     }
 
@@ -234,16 +232,16 @@ Dynamic_engraver::process_music ()
 
   if (current_spanner_)
     {
-      // Add spanner to cvspanners_
+      // Add spanner to cvspanners
       SCM spanner_id = current_span_event_->get_property ("spanner-id");
       string spanner_id_str = robust_scm2string (spanner_id, "");
-      if (spanner_id_str.size() > 0)
+      if (scm_is_string (spanner_id) && scm_c_string_length (spanner_id) > 0)
         {
-          SCM cvprops = SCM_EOL;
-          cvprops = scm_acons (ly_symbol2scm ("current-voice"), context ()->self_scm (), cvprops);
-          cvprops = scm_acons (ly_symbol2scm ("spanner"), current_spanner_->self_scm (), cvprops);
-          // TODO check if exists?
-          cvspanners_ = scm_acons (spanner_id, cvprops, cvspanners_);
+	  if (scm_is_pair (GET_CV_ENTRY (spanner_id)))
+	    {
+	      // warning?
+	    }
+	  CREATE_CV_ENTRY (spanner_id, context (), current_spanner_);
           // Don't worry about the spanner on voice level
           current_spanner_ = 0;
           current_span_event_ = 0;
@@ -264,15 +262,11 @@ Dynamic_engraver::stop_translation_timestep ()
     ->set_bound (LEFT,
                  unsmob<Grob> (get_property ("currentMusicalColumn")));
 
-  for (SCM s = cvspanners_; scm_is_pair (s); s = scm_cdr (s))
+  list<Spanner *> span_list = get_cv_spanners_in_voice (context ());
+  for (list<Spanner *>::iterator it = span_list.begin (); it != span_list.end (); it++)
     {
-      SCM entry = scm_cdar (s);
-      if (scm_assoc_ref (entry, ly_symbol2scm ("current-voice")) == context ()->self_scm ())
-        {
-          Spanner *span = unsmob<Spanner> (scm_assoc_ref (entry, ly_symbol2scm ("spanner")));
-          if (!span->get_bound (LEFT))
-            span->set_bound (LEFT, unsmob<Grob> (get_property ("currentMusicalColumn")));
-        }
+        if (!(*it)->get_bound (LEFT))
+          (*it)->set_bound (LEFT, unsmob<Grob> (get_property ("currentMusicalColumn")));
     }
 
   script_ = 0;
