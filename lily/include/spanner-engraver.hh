@@ -1,14 +1,14 @@
 #include "context.hh"
-#include <list>
+#include <vector>
 
 // alist:
 // ((<spanner-id string> . (('current-voice . voice) ('spanner . spanner))) etc)
-#define SPANNER_ENGRAVER_DECLARATIONS() \
+#define CV_SPANNER_DECLARATIONS() \
   private:                                                         \
   static SCM cvspanners_;                                          \
-  list<Spanner *> get_cv_spanners_in_voice (Context *context)      \
+  vector<Spanner *> get_cv_spanners_in_voice (Context *context)    \
   {                                                                \
-    list<Spanner *> span_list;                                     \
+    vector<Spanner *> spanners;                                    \
     for (SCM s = cvspanners_; scm_is_pair (s); s = scm_cdr (s))    \
       {                                                            \
         SCM entry = scm_cdar (s);                                  \
@@ -17,10 +17,10 @@
           {                                                        \
             Spanner *span = unsmob<Spanner> (scm_assoc_ref (       \
               entry, ly_symbol2scm ("spanner")));                  \
-            span_list.push_back (span);                            \
+            spanners.push_back (span);                             \
           }                                                        \
       }                                                            \
-    return span_list;                                              \
+    return spanners;                                               \
   }
 
 #define GET_CV_ENTRY(spanner_id) scm_assoc_ref (cvspanners_, spanner_id)
