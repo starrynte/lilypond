@@ -67,7 +67,6 @@ private:
 
   CV_SPANNER_DECLARATIONS ();
 };
-SCM Dynamic_engraver::cvspanners_ = SCM_EOL;
 
 Dynamic_engraver::Dynamic_engraver ()
 {
@@ -147,6 +146,8 @@ Dynamic_engraver::get_property_setting (Stream_event *evt,
 void
 Dynamic_engraver::process_music ()
 {
+  UPDATE_MY_CV_SPANNERS ();
+
   if (current_spanner_
       && (accepted_spanevents_drul_[STOP]
           || script_event_
@@ -253,7 +254,7 @@ Dynamic_engraver::process_music ()
         }
       else
         {
-          // Add spanner to cvspanners
+          // Add spanner to sharedSpanners
           if (scm_is_pair (GET_CV_ENTRY (id)))
             {
               // spanner with this id already exists, warning?
@@ -291,11 +292,10 @@ Dynamic_engraver::stop_translation_timestep ()
     ->set_bound (LEFT,
                  unsmob<Grob> (get_property ("currentMusicalColumn")));
 
-  vector<Spanner *> spanners = get_cv_spanners_in_voice (context ());
-  for (size_t i = 0; i < spanners.size(); i++)
+  for (size_t i = 0; i < my_cv_spanners_.size(); i++)
     {
-        if (!spanners[i]->get_bound (LEFT))
-          spanners[i]->set_bound (LEFT, unsmob<Grob> (get_property ("currentMusicalColumn")));
+        if (!my_cv_spanners_[i]->get_bound (LEFT))
+          my_cv_spanners_[i]->set_bound (LEFT, unsmob<Grob> (get_property ("currentMusicalColumn")));
     }
 
   script_ = 0;
@@ -359,11 +359,10 @@ Dynamic_engraver::acknowledge_note_column (Grob_info info)
 
   if (current_spanner_ && !current_spanner_->get_bound (LEFT))
     current_spanner_->set_bound (LEFT, info.grob ());
-  vector<Spanner *> spanners = get_cv_spanners_in_voice (context ());
-  for (size_t i = 0; i < spanners.size (); i++)
+  for (size_t i = 0; i < my_cv_spanners_.size (); i++)
     {
-      if (!spanners[i]->get_bound (LEFT))
-        spanners[i]->set_bound (LEFT, info.grob ());
+      if (!my_cv_spanners_[i]->get_bound (LEFT))
+        my_cv_spanners_[i]->set_bound (LEFT, info.grob ());
     }
   for (size_t i = 0; i < finished_spanners_.size (); i++)
     {
