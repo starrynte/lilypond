@@ -1,49 +1,58 @@
 #include "context.hh"
 #include <vector>
 
-// context property sharedSpanners is an alist:
-// ((<spanner-id string> . (('current-voice . voice) ('spanner . spanner))) etc)
+// Context property sharedSpanners is an alist:
+// ((<spanner-id string> . (voice . spanner)) etc)
+
+// List of spanners in this voice: avoid repeatedly looking up properties
 #define CV_SPANNER_DECLARATIONS()    \
   private:                           \
   vector<Spanner *> my_cv_spanners_; \
 
-#define UPDATE_MY_CV_SPANNERS()                                         \
-  my_cv_spanners_.clear ();                                             \
-  {                                                                     \
-    SCM my_context = context ()->self_scm ();                           \
-    for (Context *c = context ();                                       \
-        c != NULL; c = c->get_parent_context ())                        \
-      {                                                                 \
-        for (SCM s = c->get_property ("sharedSpanners");                \
-            scm_is_pair (s); s = scm_cdr (s))                           \
-          {                                                             \
-            SCM entry = scm_cdar (s);                                   \
-            if (ly_is_equal (                                           \
-                scm_assoc_ref (entry, ly_symbol2scm ("current-voice")), \
-                my_context))                                            \
-              {                                                         \
-                Spanner *span = unsmob<Spanner> (scm_assoc_ref (        \
-                  entry, ly_symbol2scm ("spanner")));                   \
-                my_cv_spanners_.push_back (span);                       \
-              }                                                         \
-          }                                                             \
-      }                                                                 \
+// Update the list of spanners currently part of this voice
+// This should run at the beginning of every process_music ()
+#define UPDATE_MY_CV_SPANNERS()                                    \
+  my_cv_spanners_.clear ();                                        \
+  {                                                                \
+    SCM my_context = context ()->self_scm ();                      \
+    for (Context *c = context ();                                  \
+        c != NULL; c = c->get_parent_context ())                   \
+      {                                                            \
+        for (SCM s = c->get_property ("sharedSpanners");           \
+            scm_is_pair (s); s = scm_cdr (s))                      \
+          {                                                        \
+            SCM entry = scm_cdar (s);                              \
+            if (ly_is_equal (scm_car (entry), my_context))         \
+              {                                                    \
+                Spanner *span = unsmob<Spanner> (scm_cdr (entry)); \
+                my_cv_spanners_.push_back (span);                  \
+              }                                                    \
+          }                                                        \
+      }                                                            \
   }
 
-// The remaining macros, for now, only use the score context's property and are WIP
-#define GET_CV_ENTRY(spanner_id) scm_assoc_ref (context ()->get_score_context ()->get_property ("sharedSpanners"), spanner_id)
+// Get (voice . spanner) entry associated with an id
+// Here and later: look in share_context's context property
+#define GET_CV_ENTRY(share_context, spanner_id) \
+  scm_assoc_ref (share_context->get_property ("sharedSpanners"), spanner_id)
 
-#define GET_CV_ENTRY_SPANNER(entry) \
-  unsmob<Spanner> (scm_assoc_ref (entry, ly_symbol2scm ("spanner")))
+// Get Spanner pointer from (voice . spanner) entry
+#define GET_CV_ENTRY_SPANNER(entry) unsmob<Spanner> (scm_cdr (entry))
 
-#define SET_CV_ENTRY_CONTEXT(spanner_id, entry, context) \
-  entry = scm_assoc_set_x (entry, ly_symbol2scm ("current-voice"), \
-    context->self_scm ()); \
-  context->get_score_context ()->set_property ("sharedSpanners", scm_assoc_set_x (context->get_score_context ()->get_property ("sharedSpanners"), spanner_id, entry));
+// Set the (voice . spanner) entry's context to this voice
+#define SET_CV_ENTRY_CONTEXT(share_context, spanner_id, entry)       \
+  scm_set_car_x (entry, context ()->self_scm ());                    \
+  share_context->set_property ("sharedSpanners",                     \
+    scm_assoc_set_x (share_context->get_property ("sharedSpanners"), \
+      spanner_id, entry));
 
-#define DELETE_CV_ENTRY(spanner_id) context ()->get_score_context ()->set_property ("sharedSpanners", scm_assoc_remove_x (context ()->get_score_context ()->get_property ("sharedSpanners"), spanner_id));
+#define DELETE_CV_ENTRY(share_context, spanner_id)                      \
+  share_context->set_property ("sharedSpanners",                        \
+    scm_assoc_remove_x (share_context->get_property ("sharedSpanners"), \
+      spanner_id));
 
-#define CREATE_CV_ENTRY(spanner_id, context, spanner) \
-  SCM entry = scm_acons (ly_symbol2scm ("current-voice"), context->self_scm (), SCM_EOL); \
-  entry = scm_acons (ly_symbol2scm ("spanner"), spanner->self_scm (), entry); \
-  context->get_score_context ()->set_property ("sharedSpanners", scm_acons (spanner_id, entry, context->get_score_context ()->get_property ("sharedSpanners")));
+#define CREATE_CV_ENTRY(share_context, spanner_id, spanner) \
+  SCM entry = scm_cons (context ()->self_scm (), spanner->self_scm ()); \
+  share_context->set_property ("sharedSpanners",                     \
+    scm_acons (spanner_id, entry,                                    \
+      share_context->get_property ("sharedSpanners")));

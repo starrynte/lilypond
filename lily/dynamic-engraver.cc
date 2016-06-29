@@ -117,10 +117,10 @@ Dynamic_engraver::listen_break_span (Stream_event *event)
 
       if (scm_is_string (id))
         {
-          SCM entry = GET_CV_ENTRY (id);
+          SCM entry = GET_CV_ENTRY (context ()->get_score_context (), id);
           if (scm_is_pair (entry))
             {
-              SET_CV_ENTRY_CONTEXT (id, entry, context ());
+              SET_CV_ENTRY_CONTEXT (context ()->get_score_context (), id, entry);
               Spanner *span = GET_CV_ENTRY_SPANNER (entry);
               span->set_property ("spanner-broken", SCM_BOOL_T);
             }
@@ -169,7 +169,7 @@ Dynamic_engraver::process_music ()
     {
       Stream_event *ender = named_stop_events_[i];
       SCM ender_id = ender->get_property ("spanner-id");
-      SCM entry = GET_CV_ENTRY (ender_id);
+      SCM entry = GET_CV_ENTRY (context ()->get_score_context (), ender_id);
       if (scm_is_string (ender_id) && scm_is_pair (entry))
         {
           // We got a STOP event for the spanner, so end it
@@ -177,7 +177,7 @@ Dynamic_engraver::process_music ()
           finished_spanners_.push_back (spanner);
           debug_output ("announcing cv spanner");
           announce_end_grob (spanner, ender->self_scm ());
-          DELETE_CV_ENTRY (ender_id);
+          DELETE_CV_ENTRY (context ()->get_score_context (), ender_id);
         }
     }
 
@@ -255,11 +255,11 @@ Dynamic_engraver::process_music ()
       else
         {
           // Add spanner to sharedSpanners
-          if (scm_is_pair (GET_CV_ENTRY (id)))
+          if (scm_is_pair (GET_CV_ENTRY (context ()->get_score_context (), id)))
             {
               // spanner with this id already exists, warning?
             }
-          CREATE_CV_ENTRY (id, context (), spanner);
+          CREATE_CV_ENTRY (context ()->get_score_context (), id, spanner);
         }
     }
 
