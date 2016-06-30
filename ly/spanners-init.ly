@@ -13,6 +13,9 @@ or parallel slurs or phrasing slurs within a single @code{Voice}.
 	(if (number? id)
 	    (number->string id)
 	    id))
+% Temporarily just use Score
+  (set! (ly:music-property event 'spanner-share-context)
+        'Score)
   event)
 
 startGroup = #(make-span-event 'NoteGroupingEvent START)
