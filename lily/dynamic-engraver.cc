@@ -27,15 +27,15 @@
 #include "self-alignment-interface.hh"
 #include "spanner.hh"
 #include "spanner-engraver.hh"
+#include "std-vector.hh"
 #include "stream-event.hh"
 #include "text-interface.hh"
 
 #include <map>
-#include <vector>
 
 #include "translator.icc"
 
-class Dynamic_engraver : public Engraver
+class Dynamic_engraver : public Spanner_engraver
 {
   TRANSLATOR_DECLARATIONS (Dynamic_engraver);
   void acknowledge_note_column (Grob_info);
@@ -64,8 +64,6 @@ private:
   Stream_event *current_span_event_;
   // Map from spanner-id to value
   map<string, bool> end_new_spanner_;
-
-  CV_SPANNER_DECLARATIONS ();
 };
 
 Dynamic_engraver::Dynamic_engraver ()
@@ -118,11 +116,11 @@ Dynamic_engraver::listen_break_span (Stream_event *event)
       if (scm_is_string (id))
         {
           Context *share = get_share_context (event->get_property ("spanner-share-context"));
-          SCM entry = GET_CV_ENTRY (share, id);
+          SCM entry = get_cv_entry (share, id);
           if (scm_is_pair (entry))
             {
-              SET_CV_ENTRY_CONTEXT (share, id, entry);
-              Spanner *span = GET_CV_ENTRY_SPANNER (entry);
+              set_cv_entry_context (share, id, entry);
+              Spanner *span = get_cv_entry_spanner (entry);
               span->set_property ("spanner-broken", SCM_BOOL_T);
             }
         }
@@ -147,7 +145,7 @@ Dynamic_engraver::get_property_setting (Stream_event *evt,
 void
 Dynamic_engraver::process_music ()
 {
-  UPDATE_MY_CV_SPANNERS ();
+  update_my_cv_spanners ();
 
   if (current_spanner_
       && (accepted_spanevents_drul_[STOP]
@@ -171,15 +169,15 @@ Dynamic_engraver::process_music ()
       Stream_event *ender = named_stop_events_[i];
       SCM ender_id = ender->get_property ("spanner-id");
       Context *share = get_share_context (ender->get_property ("spanner-share-context"));
-      SCM entry = GET_CV_ENTRY (share, ender_id);
+      SCM entry = get_cv_entry (share, ender_id);
       if (scm_is_string (ender_id) && scm_is_pair (entry))
         {
           // We got a STOP event for the spanner, so end it
-          Spanner *spanner = GET_CV_ENTRY_SPANNER (entry);
+          Spanner *spanner = get_cv_entry_spanner (entry);
           finished_spanners_.push_back (spanner);
           debug_output ("announcing cv spanner");
           announce_end_grob (spanner, ender->self_scm ());
-          DELETE_CV_ENTRY (share, ender_id);
+          delete_cv_entry (share, ender_id);
         }
     }
 
@@ -258,11 +256,11 @@ Dynamic_engraver::process_music ()
         {
           Context *share = get_share_context (ev->get_property ("spanner-share-context"));
           // Add spanner to sharedSpanners
-          if (scm_is_pair (GET_CV_ENTRY (share, id)))
+          if (scm_is_pair (get_cv_entry (share, id)))
             {
               // spanner with this id already exists, warning?
             }
-          CREATE_CV_ENTRY (share, id, spanner);
+          create_cv_entry (share, id, spanner);
         }
     }
 
