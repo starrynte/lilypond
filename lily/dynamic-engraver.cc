@@ -53,15 +53,12 @@ private:
                             char const *ctxprop);
   string get_spanner_type (Stream_event *ev);
 
-  Drul_array<Stream_event *> accepted_spanevents_drul_;
-  vector<Stream_event *> named_start_events_;
-  vector<Stream_event *> named_stop_events_;
-  Spanner *current_spanner_;
+  vector<Stream_event *> start_events_;
+  vector<Stream_event *> stop_events_;
   vector<Spanner *> finished_spanners_;
 
   Item *script_;
   Stream_event *script_event_;
-  Stream_event *current_span_event_;
   // Map from spanner-id to value
   map<string, bool> end_new_spanner_;
 };
@@ -69,15 +66,13 @@ private:
 Dynamic_engraver::Dynamic_engraver ()
 {
   script_event_ = 0;
-  current_span_event_ = 0;
   script_ = 0;
-  current_spanner_ = 0;
-  accepted_spanevents_drul_.set (0, 0);
 }
 
 void
 Dynamic_engraver::listen_absolute_dynamic (Stream_event *ev)
 {
+  check_event_properties (ev);
   ASSIGN_EVENT_ONCE (script_event_, ev);
 }
 
@@ -88,17 +83,11 @@ Dynamic_engraver::listen_span_dynamic (Stream_event *ev)
   SCM id = ev->get_property ("spanner-id");
   debug_output (string("received: ") + (d == START ? "START" : "STOP") + ", id " + robust_scm2string (id, ""));
 
-  if (scm_is_string (id))
-    {
-      if (d == START)
-        named_start_events_.push_back (ev);
-      else if (d == STOP)
-        named_stop_events_.push_back (ev);
-    }
-  else
-    {
-      ASSIGN_EVENT_ONCE (accepted_spanevents_drul_[d], ev);
-    }
+  check_event_properties (ev);
+  if (d == START)
+    start_events_.push_back (ev);
+  else if (d == STOP)
+    stop_events_.push_back (ev);
 }
 
 void
@@ -110,23 +99,17 @@ Dynamic_engraver::listen_break_span (Stream_event *event)
       //         spanner (created later) -> set a flag
       // Case 2: no new spanner, but spanner already active -> break it now
       // Only break cross voice spanners if event has matching id
+      check_event_properties (event);
       SCM id = event->get_property ("spanner-id");
       end_new_spanner_[robust_scm2string (id, "")] = true;
 
-      if (scm_is_string (id))
+      Context *share = get_share_context (event->get_property ("spanner-share-context"));
+      SCM entry = get_cv_entry (share, id);
+      if (scm_is_pair (entry))
         {
-          Context *share = get_share_context (event->get_property ("spanner-share-context"));
-          SCM entry = get_cv_entry (share, id);
-          if (scm_is_pair (entry))
-            {
-              set_cv_entry_context (share, id, entry);
-              Spanner *span = get_cv_entry_spanner (entry);
-              span->set_property ("spanner-broken", SCM_BOOL_T);
-            }
-        }
-      else if (current_spanner_)
-        {
-          current_spanner_->set_property ("spanner-broken", SCM_BOOL_T);
+          set_cv_entry_context (share, id, entry);
+          Spanner *span = get_cv_entry_spanner (entry);
+          span->set_property ("spanner-broken", SCM_BOOL_T);
         }
     }
 }
@@ -147,52 +130,36 @@ Dynamic_engraver::process_music ()
 {
   update_my_cv_spanners ();
 
-  if (current_spanner_
-      && (accepted_spanevents_drul_[STOP]
-          || script_event_
-          || accepted_spanevents_drul_[START]))
-    {
-      Stream_event *ender = accepted_spanevents_drul_[STOP];
-      if (!ender)
-        ender = script_event_;
+  // All events that end: stop events, start events, script event
+  vector<Stream_event *> enders = stop_events_;
+  enders.insert (enders.end (), start_events_.begin (), start_events_.end ());
+  if (script_event_)
+    enders.push_back (script_event_);
 
-      if (!ender)
-        ender = accepted_spanevents_drul_[START];
-
-      finished_spanners_.push_back (current_spanner_);
-      announce_end_grob (current_spanner_, ender->self_scm ());
-      current_spanner_ = 0;
-      current_span_event_ = 0;
-    }
-  for (size_t i = 0; i < named_stop_events_.size (); i++)
+  for (vsize i = 0; i < enders.size (); i++)
     {
-      Stream_event *ender = named_stop_events_[i];
+      Stream_event *ender = enders[i];
+
       SCM ender_id = ender->get_property ("spanner-id");
       Context *share = get_share_context (ender->get_property ("spanner-share-context"));
       SCM entry = get_cv_entry (share, ender_id);
       if (scm_is_string (ender_id) && scm_is_pair (entry))
         {
-          // We got a STOP event for the spanner, so end it
           Spanner *spanner = get_cv_entry_spanner (entry);
           finished_spanners_.push_back (spanner);
-          debug_output ("announcing cv spanner");
+          debug_output ("announcing end cv spanner from share " + share->context_name ());
           announce_end_grob (spanner, ender->self_scm ());
           delete_cv_entry (share, ender_id);
         }
     }
 
-  vector<Stream_event *> start_events = named_start_events_;
-  if (accepted_spanevents_drul_[START])
-    start_events.push_back (accepted_spanevents_drul_[START]);
   vector<Spanner *> start_spanners;
-  for (size_t i = 0; i < start_events.size(); i++)
+  for (vsize i = 0; i < start_events_.size(); i++)
     {
-      Stream_event *ev = start_events[i];
+      Stream_event *ev = start_events_[i];
       SCM id = ev->get_property ("spanner-id");
       string id_string = robust_scm2string (id, "");
-      // If this is the within-voice spanner
-      if (!scm_is_string (id))
-        current_span_event_ = accepted_spanevents_drul_[START];
+      debug_output ("checking start event with id " + id_string);
       Spanner *spanner;
 
       string start_type = get_spanner_type (ev);
@@ -201,9 +168,7 @@ Dynamic_engraver::process_music ()
 
       if (scm_is_eq (cresc_type, ly_symbol2scm ("text")))
         {
-          spanner
-            = make_spanner ("DynamicTextSpanner",
-                            accepted_spanevents_drul_[START]->self_scm ());
+          spanner = make_spanner ("DynamicTextSpanner", ev->self_scm ());
 
           SCM text = get_property_setting (ev, "span-text",
                                            (start_type + "Text").c_str ());
@@ -248,20 +213,14 @@ Dynamic_engraver::process_music ()
         }
 
       start_spanners.push_back (spanner);
-      if (!scm_is_string (id))
+      Context *share = get_share_context (ev->get_property ("spanner-share-context"));
+      debug_output ("announcing start cv spanner from share " + share->context_name ());
+      // Add spanner to sharedSpanners
+      if (scm_is_pair (get_cv_entry (share, id)))
         {
-          current_spanner_ = spanner;
+          // spanner with this id already exists, warning?
         }
-      else
-        {
-          Context *share = get_share_context (ev->get_property ("spanner-share-context"));
-          // Add spanner to sharedSpanners
-          if (scm_is_pair (get_cv_entry (share, id)))
-            {
-              // spanner with this id already exists, warning?
-            }
-          create_cv_entry (share, id, spanner);
-        }
+      create_cv_entry (share, id, spanner);
     }
 
   if (script_event_)
@@ -270,9 +229,9 @@ Dynamic_engraver::process_music ()
       script_->set_property ("text",
                              script_event_->get_property ("text"));
 
-      for (size_t i = 0; i < finished_spanners_.size (); i++)
+      for (vsize i = 0; i < finished_spanners_.size (); i++)
         finished_spanners_[i]->set_bound (RIGHT, script_);
-      for (size_t i = 0; i < start_spanners.size (); i++)
+      for (vsize i = 0; i < start_spanners.size (); i++)
         start_spanners[i]->set_bound (LEFT, script_);
     }
 }
@@ -280,7 +239,7 @@ Dynamic_engraver::process_music ()
 void
 Dynamic_engraver::stop_translation_timestep ()
 {
-  for (size_t i = 0; i < finished_spanners_.size (); i++)
+  for (vsize i = 0; i < finished_spanners_.size (); i++)
     {
       if (!finished_spanners_[i]->get_bound (RIGHT))
         finished_spanners_[i]
@@ -288,12 +247,7 @@ Dynamic_engraver::stop_translation_timestep ()
                      unsmob<Grob> (get_property ("currentMusicalColumn")));
     }
 
-  if (current_spanner_ && !current_spanner_->get_bound (LEFT))
-    current_spanner_
-    ->set_bound (LEFT,
-                 unsmob<Grob> (get_property ("currentMusicalColumn")));
-
-  for (size_t i = 0; i < my_cv_spanners_.size(); i++)
+  for (vsize i = 0; i < my_cv_spanners_.size(); i++)
     {
         if (!my_cv_spanners_[i]->get_bound (LEFT))
           my_cv_spanners_[i]->set_bound (LEFT, unsmob<Grob> (get_property ("currentMusicalColumn")));
@@ -301,9 +255,8 @@ Dynamic_engraver::stop_translation_timestep ()
 
   script_ = 0;
   script_event_ = 0;
-  accepted_spanevents_drul_.set (0, 0);
-  named_start_events_.clear ();
-  named_stop_events_.clear ();
+  start_events_.clear ();
+  stop_events_.clear ();
   finished_spanners_.clear ();
   end_new_spanner_.clear ();
 }
@@ -311,18 +264,18 @@ Dynamic_engraver::stop_translation_timestep ()
 void
 Dynamic_engraver::finalize ()
 {
-  if (current_spanner_
-      && !current_spanner_->is_live ())
-    current_spanner_ = 0;
-  if (current_spanner_)
-    {
-      current_span_event_
-      ->origin ()->warning (_f ("unterminated %s",
-                                get_spanner_type (current_span_event_)
-                                .c_str ()));
-      current_spanner_->suicide ();
-      current_spanner_ = 0;
-    }
+//  if (current_spanner_
+//      && !current_spanner_->is_live ())
+//    current_spanner_ = 0;
+//  if (current_spanner_)
+//    {
+//      current_span_event_
+//      ->origin ()->warning (_f ("unterminated %s",
+//                                get_spanner_type (current_span_event_)
+//                                .c_str ()));
+//      current_spanner_->suicide ();
+//      current_spanner_ = 0;
+//    }
 }
 
 string
@@ -358,14 +311,12 @@ Dynamic_engraver::acknowledge_note_column (Grob_info info)
         script_->set_parent (x_parent, X_AXIS);
     }
 
-  if (current_spanner_ && !current_spanner_->get_bound (LEFT))
-    current_spanner_->set_bound (LEFT, info.grob ());
-  for (size_t i = 0; i < my_cv_spanners_.size (); i++)
+  for (vsize i = 0; i < my_cv_spanners_.size (); i++)
     {
       if (!my_cv_spanners_[i]->get_bound (LEFT))
         my_cv_spanners_[i]->set_bound (LEFT, info.grob ());
     }
-  for (size_t i = 0; i < finished_spanners_.size (); i++)
+  for (vsize i = 0; i < finished_spanners_.size (); i++)
     {
       if (!finished_spanners_[i]->get_bound (RIGHT))
         finished_spanners_[i]->set_bound (RIGHT, info.grob ());

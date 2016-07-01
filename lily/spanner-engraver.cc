@@ -59,4 +59,14 @@ void Spanner_engraver::create_cv_entry(Context *share_context, SCM spanner_id, S
   share_context->set_property ("sharedSpanners",
     scm_acons (spanner_id, entry,
       share_context->get_property ("sharedSpanners")));
+  my_cv_spanners_.push_back (spanner);
+}
+
+void Spanner_engraver::check_event_properties(Stream_event *ev)
+{
+  if (!scm_is_string (ev->get_property ("spanner-id")))
+    {   
+      ev->set_property ("spanner-id", ly_string2scm (""));
+      ev->set_property ("spanner-share-context", ly_symbol2scm ("Voice"));
+    }
 }

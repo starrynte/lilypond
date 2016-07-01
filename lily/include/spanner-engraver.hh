@@ -5,6 +5,7 @@
 // ((<spanner-id string> . (voice . spanner)) etc)
 
 class Context;
+class Stream_event;
 class Spanner_engraver : public Engraver
 {
 protected:
@@ -27,7 +28,14 @@ protected:
   // Set the (voice . spanner) entry's context to this voice
   void set_cv_entry_context(Context *share_context, SCM spanner_id, SCM entry);
 
+  // Delete entry from share_context's sharedSpanners property
   void delete_cv_entry(Context *share_context, SCM spanner_id);
 
+  // Create entry in share_context's sharedSpanners property
+  // Also adds spanner to my_cv_spanners_
   void create_cv_entry(Context *share_context, SCM spanner_id, Spanner *spanner);
+
+  // (subject to change implementation) used to set spanner-id to ""
+  // and spanner-share-context to 'Voice if no id is given
+  void check_event_properties(Stream_event *ev);
 };
