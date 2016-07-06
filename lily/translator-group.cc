@@ -33,6 +33,8 @@
 #include "performer-group.hh"
 #include "scheme-engraver.hh"
 #include "scm-hash.hh"
+#include "spanner.hh"
+#include "stream-event.hh"
 #include "warn.hh"
 
 void
@@ -84,6 +86,22 @@ Translator_group::disconnect_from_context ()
 void
 Translator_group::finalize ()
 {
+  // Doesn't fully work since get_property looks in parent contexts
+  for (SCM s = context_->get_property ("sharedSpanners");
+      scm_is_pair (s); s = scm_cdr (s))
+    {
+      SCM entry = scm_cdar (s);
+      Spanner *span = unsmob<Spanner> (scm_list_ref (entry, scm_from_int (1)));
+      Stream_event *event = unsmob<Stream_event> (
+        scm_list_ref (entry, scm_from_int (2)));
+      if (span->is_live ())
+        {
+          event->origin ()->warning (_f (
+            "unterminated %s", "something-TBD"));
+          span->suicide ();
+	}
+    }
+    context_->set_property ("sharedSpanners", SCM_EOL);
 }
 
 /*

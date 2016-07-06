@@ -100,7 +100,7 @@ Dynamic_engraver::listen_break_span (Stream_event *event)
       // Only break cross voice spanners if event has matching id
 
       SCM id = event->get_property ("spanner-id");
-      for (int i = 0; i < start_events_.size (); i++)
+      for (vsize i = 0; i < start_events_.size (); i++)
         {
           if (ly_is_equal (start_events_[i]->get_property ("spanner-id"), id))
 	    {

@@ -40,8 +40,8 @@ Spanner *Spanner_engraver::get_cv_entry_spanner (SCM entry)
   return unsmob<Spanner> (scm_list_ref (entry, scm_from_int(1)));
 }
 
-void Spanner_engraver::set_cv_entry_context(Context *share_context,
-                                            SCM spanner_id, SCM entry)
+void Spanner_engraver::set_cv_entry_context (Context *share_context,
+                                             SCM spanner_id, SCM entry)
 {
   scm_list_set_x (entry, scm_from_int (0), context ()->self_scm ());
   share_context->set_property ("sharedSpanners",
@@ -49,15 +49,15 @@ void Spanner_engraver::set_cv_entry_context(Context *share_context,
       spanner_id, entry));
 }
 
-void Spanner_engraver::delete_cv_entry(Context *share_context, SCM spanner_id)
+void Spanner_engraver::delete_cv_entry (Context *share_context, SCM spanner_id)
 {
   share_context->set_property ("sharedSpanners",
     scm_assoc_remove_x (share_context->get_property ("sharedSpanners"),
       spanner_id));
 }
 
-void Spanner_engraver::create_cv_entry(Context *share_context, SCM spanner_id,
-                                       Spanner *spanner, Stream_event *event)
+void Spanner_engraver::create_cv_entry (Context *share_context, SCM spanner_id,
+                                        Spanner *spanner, Stream_event *event)
 {
   SCM entry = scm_list_3 (context ()->self_scm (), spanner->self_scm (),
     event->self_scm ());

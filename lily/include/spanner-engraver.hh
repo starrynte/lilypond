@@ -20,19 +20,19 @@ protected:
 
   // Get (voice . spanner) entry associated with an id
   // Here and later: look in share_context's context property
-  SCM get_cv_entry (Context *share_context, SCM spanner_id);
+  static SCM get_cv_entry (Context *share_context, SCM spanner_id);
 
   // Get Spanner pointer from (voice . spanner) entry
-  Spanner *get_cv_entry_spanner (SCM entry);
+  static Spanner *get_cv_entry_spanner (SCM entry);
 
   // Set the (voice . spanner) entry's context to this voice
-  void set_cv_entry_context(Context *share_context, SCM spanner_id, SCM entry);
+  void set_cv_entry_context (Context *share_context, SCM spanner_id, SCM entry);
 
   // Delete entry from share_context's sharedSpanners property
-  void delete_cv_entry(Context *share_context, SCM spanner_id);
+  static void delete_cv_entry (Context *share_context, SCM spanner_id);
 
   // Create entry in share_context's sharedSpanners property
   // Also adds spanner to my_cv_spanners_
-  void create_cv_entry(Context *share_context, SCM spanner_id, Spanner *spanner,
-                       Stream_event *event);
+  void create_cv_entry (Context *share_context, SCM spanner_id, Spanner *spanner,
+                        Stream_event *event);
 };
