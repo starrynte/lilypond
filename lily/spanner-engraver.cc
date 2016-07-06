@@ -13,9 +13,10 @@ void Spanner_engraver::update_my_cv_spanners ()
           scm_is_pair (s); s = scm_cdr (s))
         {
           SCM entry = scm_cdar (s);
-          if (ly_is_equal (scm_car (entry), my_context))
+          if (ly_is_equal (scm_list_ref (entry, scm_from_int(0)), my_context))
             {
-              Spanner *span = unsmob<Spanner> (scm_cdr (entry));
+              Spanner *span = unsmob<Spanner> (
+	        scm_list_ref (entry, scm_from_int(1)));
               my_cv_spanners_.push_back (span);
             }
         }
@@ -25,22 +26,24 @@ void Spanner_engraver::update_my_cv_spanners ()
 Context *Spanner_engraver::get_share_context (SCM s)
 {
   Context *share = find_context_above (context (), s);
-  return (share == NULL) ? context ()->get_score_context () : share;
+  return (share == NULL) ? context () : share;
 }
 
 SCM Spanner_engraver::get_cv_entry (Context *share_context, SCM spanner_id)
 {
-  return scm_assoc_ref (share_context->get_property ("sharedSpanners"), spanner_id);
+  return scm_assoc_ref (share_context->get_property ("sharedSpanners"),
+                        spanner_id);
 }
 
 Spanner *Spanner_engraver::get_cv_entry_spanner (SCM entry)
 {
-  return unsmob<Spanner> (scm_cdr (entry));
+  return unsmob<Spanner> (scm_list_ref (entry, scm_from_int(1)));
 }
 
-void Spanner_engraver::set_cv_entry_context(Context *share_context, SCM spanner_id, SCM entry)
+void Spanner_engraver::set_cv_entry_context(Context *share_context,
+                                            SCM spanner_id, SCM entry)
 {
-  scm_set_car_x (entry, context ()->self_scm ());
+  scm_list_set_x (entry, scm_from_int (0), context ()->self_scm ());
   share_context->set_property ("sharedSpanners",
     scm_assoc_set_x (share_context->get_property ("sharedSpanners"),
       spanner_id, entry));
@@ -53,20 +56,13 @@ void Spanner_engraver::delete_cv_entry(Context *share_context, SCM spanner_id)
       spanner_id));
 }
 
-void Spanner_engraver::create_cv_entry(Context *share_context, SCM spanner_id, Spanner *spanner)
+void Spanner_engraver::create_cv_entry(Context *share_context, SCM spanner_id,
+                                       Spanner *spanner, Stream_event *event)
 {
-  SCM entry = scm_cons (context ()->self_scm (), spanner->self_scm ());
+  SCM entry = scm_list_3 (context ()->self_scm (), spanner->self_scm (),
+    event->self_scm ());
   share_context->set_property ("sharedSpanners",
     scm_acons (spanner_id, entry,
       share_context->get_property ("sharedSpanners")));
   my_cv_spanners_.push_back (spanner);
-}
-
-void Spanner_engraver::check_event_properties(Stream_event *ev)
-{
-  if (!scm_is_string (ev->get_property ("spanner-id")))
-    {   
-      ev->set_property ("spanner-id", ly_string2scm (""));
-      ev->set_property ("spanner-share-context", ly_symbol2scm ("Voice"));
-    }
 }

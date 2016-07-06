@@ -59,20 +59,20 @@ private:
 
   Item *script_;
   Stream_event *script_event_;
-  // Map from spanner-id to value
-  map<string, bool> end_new_spanner_;
+  // alist: (spanner-id boolean)
+  SCM end_new_spanner_;
 };
 
 Dynamic_engraver::Dynamic_engraver ()
 {
   script_event_ = 0;
   script_ = 0;
+  end_new_spanner_ = SCM_EOL;
 }
 
 void
 Dynamic_engraver::listen_absolute_dynamic (Stream_event *ev)
 {
-  check_event_properties (ev);
   ASSIGN_EVENT_ONCE (script_event_, ev);
 }
 
@@ -81,9 +81,8 @@ Dynamic_engraver::listen_span_dynamic (Stream_event *ev)
 {
   Direction d = to_dir (ev->get_property ("span-direction"));
   SCM id = ev->get_property ("spanner-id");
-  debug_output (string("received: ") + (d == START ? "START" : "STOP") + ", id " + robust_scm2string (id, ""));
+  debug_output (string("received: ") + (d == START ? "START" : "STOP") + ", id " + ly_scm2string (scm_object_to_string (id, SCM_UNDEFINED)));
 
-  check_event_properties (ev);
   if (d == START)
     start_events_.push_back (ev);
   else if (d == STOP)
@@ -99,9 +98,16 @@ Dynamic_engraver::listen_break_span (Stream_event *event)
       //         spanner (created later) -> set a flag
       // Case 2: no new spanner, but spanner already active -> break it now
       // Only break cross voice spanners if event has matching id
-      check_event_properties (event);
+
       SCM id = event->get_property ("spanner-id");
-      end_new_spanner_[robust_scm2string (id, "")] = true;
+      for (int i = 0; i < start_events_.size (); i++)
+        {
+          if (ly_is_equal (start_events_[i]->get_property ("spanner-id"), id))
+	    {
+              end_new_spanner_ = scm_assoc_set_x (end_new_spanner_, id, SCM_BOOL_T);
+	      return;
+	    }
+	}
 
       Context *share = get_share_context (event->get_property ("spanner-share-context"));
       SCM entry = get_cv_entry (share, id);
@@ -143,7 +149,7 @@ Dynamic_engraver::process_music ()
       SCM ender_id = ender->get_property ("spanner-id");
       Context *share = get_share_context (ender->get_property ("spanner-share-context"));
       SCM entry = get_cv_entry (share, ender_id);
-      if (scm_is_string (ender_id) && scm_is_pair (entry))
+      if (scm_is_pair (entry))
         {
           Spanner *spanner = get_cv_entry_spanner (entry);
           finished_spanners_.push_back (spanner);
@@ -158,8 +164,6 @@ Dynamic_engraver::process_music ()
     {
       Stream_event *ev = start_events_[i];
       SCM id = ev->get_property ("spanner-id");
-      string id_string = robust_scm2string (id, "");
-      debug_output ("checking start event with id " + id_string);
       Spanner *spanner;
 
       string start_type = get_spanner_type (ev);
@@ -193,11 +197,14 @@ Dynamic_engraver::process_music ()
             }
           spanner = make_spanner ("Hairpin", ev->self_scm ());
         }
+
+      spanner->set_property ("spanner-id", id);
+
       // if we have a break-dynamic-span event right after the start dynamic, break the new spanner immediately
-      if (end_new_spanner_[id_string])
+      if (scm_is_true (scm_assoc_ref (end_new_spanner_, id)))
         {
           spanner->set_property ("spanner-broken", SCM_BOOL_T);
-          end_new_spanner_[id_string] = false;
+          end_new_spanner_ = scm_assoc_remove_x (end_new_spanner_, id);
         }
       for (size_t j = 0; j < finished_spanners_.size (); j++)
         {
@@ -220,7 +227,7 @@ Dynamic_engraver::process_music ()
         {
           // spanner with this id already exists, warning?
         }
-      create_cv_entry (share, id, spanner);
+      create_cv_entry (share, id, spanner, ev);
     }
 
   if (script_event_)
@@ -258,7 +265,7 @@ Dynamic_engraver::stop_translation_timestep ()
   start_events_.clear ();
   stop_events_.clear ();
   finished_spanners_.clear ();
-  end_new_spanner_.clear ();
+  end_new_spanner_ = SCM_EOL;
 }
 
 void

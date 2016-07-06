@@ -2,7 +2,7 @@
 #include "std-vector.hh"
 
 // Context property sharedSpanners is an alist:
-// ((<spanner-id string> . (voice . spanner)) etc)
+// ((spanner-id . (voice spanner event)) etc)
 
 class Context;
 class Stream_event;
@@ -33,9 +33,6 @@ protected:
 
   // Create entry in share_context's sharedSpanners property
   // Also adds spanner to my_cv_spanners_
-  void create_cv_entry(Context *share_context, SCM spanner_id, Spanner *spanner);
-
-  // (subject to change implementation) used to set spanner-id to ""
-  // and spanner-share-context to 'Voice if no id is given
-  void check_event_properties(Stream_event *ev);
+  void create_cv_entry(Context *share_context, SCM spanner_id, Spanner *spanner,
+                       Stream_event *event);
 };

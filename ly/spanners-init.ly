@@ -1,7 +1,8 @@
 \version "2.19.29"
 
 "\\=" =
-#(define-event-function (id event) (number-or-string? ly:event?)
+#(define-event-function (id-and-share event) (key-list-or-symbol? ly:event?)
+; TODO edit documentation
   (_i "This sets the @code{spanner-id} property of the following
 @var{event} to the given @var{id} (numbers will be converted to a
 string).  This can be used to tell LilyPond how to connect overlapping
@@ -9,13 +10,18 @@ or parallel slurs or phrasing slurs within a single @code{Voice}.
 @lilypond[quote,verbatim]
 \\fixed c' { c\\=1( d\\=2( e\\=1) f\\=2) }
 @end lilypond\n")
-  (set! (ly:music-property event 'spanner-id)
-	(if (number? id)
-	    (number->string id)
-	    id))
-% Temporarily just use Score
-  (set! (ly:music-property event 'spanner-share-context)
-        'Score)
+  (if (key-list? id-and-share)
+    (let ((len (length id-and-share)))
+      (if (> len 2) (ly:warning "warning"))
+      (set! (ly:music-property event 'spanner-id) (car id-and-share))
+      (set! (ly:music-property event 'spanner-share-context)
+        (if (> len 1) (list-ref id-and-share 1) 'Voice))
+    )
+    (begin
+      (set! (ly:music-property event 'spanner-id) id-and-share)
+      (set! (ly:music-property event 'spanner-share-context) 'Voice)
+    )
+  )
   event)
 
 startGroup = #(make-span-event 'NoteGroupingEvent START)
