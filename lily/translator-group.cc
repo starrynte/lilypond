@@ -86,9 +86,11 @@ Translator_group::disconnect_from_context ()
 void
 Translator_group::finalize ()
 {
-  // Doesn't fully work since get_property looks in parent contexts
-  for (SCM s = context_->get_property ("sharedSpanners");
-      scm_is_pair (s); s = scm_cdr (s))
+  SCM s;
+  if (!context_->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
+    return;
+
+  for (; scm_is_pair (s); s = scm_cdr (s))
     {
       SCM entry = scm_cdar (s);
       Spanner *span = unsmob<Spanner> (scm_list_ref (entry, scm_from_int (1)));
@@ -96,12 +98,11 @@ Translator_group::finalize ()
         scm_list_ref (entry, scm_from_int (2)));
       if (span->is_live ())
         {
-          event->origin ()->warning (_f (
-            "unterminated %s", "something-TBD"));
+          event->origin ()->warning (_f ("unterminated %s", span->name ()));
           span->suicide ();
 	}
     }
-    context_->set_property ("sharedSpanners", SCM_EOL);
+    context_->unset_property ("sharedSpanners");
 }
 
 /*

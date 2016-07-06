@@ -9,8 +9,10 @@ void Spanner_engraver::update_my_cv_spanners ()
   SCM my_context = context ()->self_scm ();
   for (Context *c = context (); c != NULL; c = c->get_parent_context ())
     {
-      for (SCM s = c->get_property ("sharedSpanners");
-          scm_is_pair (s); s = scm_cdr (s))
+      SCM s;
+      if (!c->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
+        continue;
+      for (; scm_is_pair (s); s = scm_cdr (s))
         {
           SCM entry = scm_cdar (s);
           if (ly_is_equal (scm_list_ref (entry, scm_from_int(0)), my_context))
@@ -31,8 +33,11 @@ Context *Spanner_engraver::get_share_context (SCM s)
 
 SCM Spanner_engraver::get_cv_entry (Context *share_context, SCM spanner_id)
 {
-  return scm_assoc_ref (share_context->get_property ("sharedSpanners"),
-                        spanner_id);
+  SCM s;
+  if (!share_context->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
+    return SCM_EOL;
+
+  return scm_assoc_ref (s, spanner_id);
 }
 
 Spanner *Spanner_engraver::get_cv_entry_spanner (SCM entry)
@@ -44,16 +49,23 @@ void Spanner_engraver::set_cv_entry_context (Context *share_context,
                                              SCM spanner_id, SCM entry)
 {
   scm_list_set_x (entry, scm_from_int (0), context ()->self_scm ());
+
+  SCM s;
+  if (!share_context->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
+    s = SCM_EOL;
+
   share_context->set_property ("sharedSpanners",
-    scm_assoc_set_x (share_context->get_property ("sharedSpanners"),
-      spanner_id, entry));
+    scm_assoc_set_x (s, spanner_id, entry));
 }
 
 void Spanner_engraver::delete_cv_entry (Context *share_context, SCM spanner_id)
 {
+  SCM s;
+  if (!share_context->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
+    return;
+
   share_context->set_property ("sharedSpanners",
-    scm_assoc_remove_x (share_context->get_property ("sharedSpanners"),
-      spanner_id));
+    scm_assoc_remove_x (s, spanner_id));
 }
 
 void Spanner_engraver::create_cv_entry (Context *share_context, SCM spanner_id,
@@ -61,8 +73,12 @@ void Spanner_engraver::create_cv_entry (Context *share_context, SCM spanner_id,
 {
   SCM entry = scm_list_3 (context ()->self_scm (), spanner->self_scm (),
     event->self_scm ());
+
+  SCM s;
+  if (!share_context->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
+    s = SCM_EOL;
+
   share_context->set_property ("sharedSpanners",
-    scm_acons (spanner_id, entry,
-      share_context->get_property ("sharedSpanners")));
+    scm_acons (spanner_id, entry, s));
   my_cv_spanners_.push_back (spanner);
 }

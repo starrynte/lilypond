@@ -46,7 +46,6 @@ class Dynamic_engraver : public Spanner_engraver
 protected:
   virtual void process_music ();
   virtual void stop_translation_timestep ();
-  virtual void finalize ();
 
 private:
   SCM get_property_setting (Stream_event *evt, char const *evprop,
@@ -266,23 +265,6 @@ Dynamic_engraver::stop_translation_timestep ()
   stop_events_.clear ();
   finished_spanners_.clear ();
   end_new_spanner_ = SCM_EOL;
-}
-
-void
-Dynamic_engraver::finalize ()
-{
-//  if (current_spanner_
-//      && !current_spanner_->is_live ())
-//    current_spanner_ = 0;
-//  if (current_spanner_)
-//    {
-//      current_span_event_
-//      ->origin ()->warning (_f ("unterminated %s",
-//                                get_spanner_type (current_span_event_)
-//                                .c_str ()));
-//      current_spanner_->suicide ();
-//      current_spanner_ = 0;
-//    }
 }
 
 string
