@@ -2,7 +2,7 @@
 #include "std-vector.hh"
 
 // Context property sharedSpanners is an alist:
-// ((spanner-id . (voice spanner event)) etc)
+// (((engraver-class-name . spanner-id) . (voice spanner event)) etc)
 
 class Context;
 class Stream_event;
@@ -20,16 +20,16 @@ protected:
 
   // Get (voice . spanner) entry associated with an id
   // Here and later: look in share_context's context property
-  static SCM get_cv_entry (Context *share_context, SCM spanner_id);
+  SCM get_cv_entry (Context *share_context, SCM spanner_id);
 
   // Get Spanner pointer from (voice . spanner) entry
-  static Spanner *get_cv_entry_spanner (SCM entry);
+  Spanner *get_cv_entry_spanner (SCM entry);
 
   // Set the (voice . spanner) entry's context to this voice
   void set_cv_entry_context (Context *share_context, SCM spanner_id, SCM entry);
 
   // Delete entry from share_context's sharedSpanners property
-  static void delete_cv_entry (Context *share_context, SCM spanner_id);
+  void delete_cv_entry (Context *share_context, SCM spanner_id);
 
   // Create entry in share_context's sharedSpanners property
   // Also adds spanner to my_cv_spanners_

@@ -100,9 +100,9 @@ Translator_group::finalize ()
         {
           event->origin ()->warning (_f ("unterminated %s", span->name ()));
           span->suicide ();
-	}
+        }
     }
-    context_->unset_property ("sharedSpanners");
+    context_->unset_property (ly_symbol2scm ("sharedSpanners"));
 }
 
 /*

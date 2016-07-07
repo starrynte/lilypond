@@ -102,11 +102,11 @@ Dynamic_engraver::listen_break_span (Stream_event *event)
       for (vsize i = 0; i < start_events_.size (); i++)
         {
           if (ly_is_equal (start_events_[i]->get_property ("spanner-id"), id))
-	    {
+            {
               end_new_spanner_ = scm_assoc_set_x (end_new_spanner_, id, SCM_BOOL_T);
-	      return;
-	    }
-	}
+              return;
+            }
+        }
 
       Context *share = get_share_context (event->get_property ("spanner-share-context"));
       SCM entry = get_cv_entry (share, id);
@@ -159,7 +159,7 @@ Dynamic_engraver::process_music ()
     }
 
   vector<Spanner *> start_spanners;
-  for (vsize i = 0; i < start_events_.size(); i++)
+  for (vsize i = 0; i < start_events_.size (); i++)
     {
       Stream_event *ev = start_events_[i];
       SCM id = ev->get_property ("spanner-id");
@@ -253,7 +253,7 @@ Dynamic_engraver::stop_translation_timestep ()
                      unsmob<Grob> (get_property ("currentMusicalColumn")));
     }
 
-  for (vsize i = 0; i < my_cv_spanners_.size(); i++)
+  for (vsize i = 0; i < my_cv_spanners_.size (); i++)
     {
         if (!my_cv_spanners_[i]->get_bound (LEFT))
           my_cv_spanners_[i]->set_bound (LEFT, unsmob<Grob> (get_property ("currentMusicalColumn")));
