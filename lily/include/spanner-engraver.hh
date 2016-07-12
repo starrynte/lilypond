@@ -13,6 +13,8 @@ class Spanner_engraver : public Engraver
 protected:
   // List of spanners in this voice: avoid repeatedly looking up properties
   vector<Spanner *> my_cv_spanners_;
+  // Corresponding "other information"
+  vector<SCM> my_cv_spanners_other_;
 
   // Update the list of spanners currently part of this voice
   // This should run at the beginning of every process_music ()
@@ -27,8 +29,9 @@ protected:
   // Get Spanner pointer from entry
   Spanner *get_cv_entry_spanner (SCM entry);
 
-  // Get other information from entry
+  // Get/set other information from entry
   SCM get_cv_entry_other (SCM entry);
+  void set_cv_entry_other (Context *share_context, SCM spanner_id, SCM entry, SCM other);
 
   // Set entry's context to this voice
   void set_cv_entry_context (Context *share_context, SCM spanner_id, SCM entry);
@@ -40,4 +43,7 @@ protected:
   // Also adds spanner to my_cv_spanners_
   void create_cv_entry (Context *share_context, SCM spanner_id, Spanner *spanner,
                         Stream_event *event, SCM other = SCM_EOL);
+
+private:
+  void set_cv_entry (Context *share_context, SCM spanner_id, SCM entry);
 };

@@ -21,6 +21,7 @@
 #include "engraver.hh"
 
 #include "axis-group-interface.hh"
+#include "context.hh"
 #include "directional-element-interface.hh"
 #include "item.hh"
 #include "side-position-interface.hh"
@@ -30,6 +31,8 @@
 
 #include "translator.icc"
 
+// Current approach: DynamicLineSpanner only cares about
+// dynamics with matching id
 class Dynamic_align_engraver : public Spanner_engraver
 {
   TRANSLATOR_DECLARATIONS (Dynamic_align_engraver);
@@ -40,16 +43,12 @@ class Dynamic_align_engraver : public Spanner_engraver
   void acknowledge_end_dynamic (Grob_info);
 
 protected:
+  virtual void process_acknowledged ();
   virtual void stop_translation_timestep ();
 
 private:
-  void set_spanner_bounds (Spanner *line, bool end);
-  vector<Spanner *> started_spanners_;
-  // Spanner manually broken, don't use it for new grobs
-  vector<Spanner *> finished_spanners_;
-  vector<Spanner *> ended_;
-  vector<Spanner *> started_;
-  vector<Grob *> scripts_;
+  vector<Grob_info> started_;
+  vector<Grob *> footnotes_;
   vector<Grob *> support_;
 };
 
@@ -64,34 +63,25 @@ Dynamic_align_engraver::acknowledge_end_dynamic (Grob_info info)
   if (!has_interface<Spanner> (info.grob ()))
     return;
 
-  Spanner *dynamic_span = info.spanner ();
-  ended_.push_back (dynamic_span);
-
-  /* If the break flag is set, store the current spanner and let new dynamics
-   * create a new spanner
-   */
-  if (to_boolean (dynamic_span->get_property ("spanner-broken")))
+  Spanner *dynamic = info.spanner ();
+  SCM id = dynamic->get_property ("spanner-id");
+  Context *share = get_share_context (
+    dynamic->get_property ("spanner-share-context"));
+  SCM entry = get_cv_entry (share, id);
+  debug_output ("dynamicline ended " + ly_scm2string (scm_object_to_string (id, SCM_UNDEFINED)) + " " + share->context_name ());
+  if (scm_is_pair (entry))
     {
-      SCM id = dynamic_span->get_property ("spanner-id");
-      Context *share = get_share_context (
-        dynamic_span->get_property ("spanner-share-context"));
-      SCM entry = get_cv_entry (share, id);
-
-      if (scm_is_pair (entry))
+      debug_output ("entry exists");
+      SCM other = get_cv_entry_other (entry);
+      if (!scm_is_null (other) && unsmob<Spanner> (other) == dynamic)
         {
-          // Verify the dynamic matches
-          Spanner *start_dynamic = unsmob<Spanner> (get_cv_entry_other (entry));
-          if (dynamic_span == start_dynamic)
-            {
-              debug_output ("ended_spanners; delete");
-              Spanner *span = get_cv_entry_spanner (entry);
-              finished_spanners_.push_back (span);
-              delete_cv_entry (share, id);
-            }
-          else
-            debug_output ("y u no match");
+          debug_output ("other matches");
+          set_cv_entry_context (share, id, entry);
+          set_cv_entry_other (share, id, entry, SCM_EOL);
+          return;
         }
     }
+  programming_error ("lost track of this dynamic spanner");
 }
 
 void
@@ -103,8 +93,7 @@ Dynamic_align_engraver::acknowledge_footnote_spanner (Grob_info info)
   if (parent
       && parent->internal_has_interface (ly_symbol2scm ("dynamic-interface")))
     {
-      for (vsize i = 0; i < my_cv_spanners_.size (); i++)
-        Axis_group_interface::add_element (my_cv_spanners_[i], grob);
+      footnotes_.push_back (grob);
     }
 }
 
@@ -123,144 +112,114 @@ Dynamic_align_engraver::acknowledge_stem (Grob_info info)
 void
 Dynamic_align_engraver::acknowledge_dynamic (Grob_info info)
 {
-  Grob *dynamic = info.grob ();
-  SCM id = dynamic->get_property ("spanner-id");
-  Context *share = get_share_context (
-      dynamic->get_property ("spanner-share-context"));
-  SCM entry = get_cv_entry (share, id);
-  Spanner *span = 0;
-  if (scm_is_pair (entry))
-  {
-    Spanner *start_dynamic = unsmob<Spanner> (get_cv_entry_other (entry));
-    if (dynamic == start_dynamic)
-      span = get_cv_entry_spanner (entry);
-    else debug_output ("y u no match??");
-  }
-
-  Stream_event *cause = info.event_cause ();
-  // Check whether an existing line spanner has the same direction
-  if (cause && span)
-    {
-      Direction line_dir = get_grob_direction (span);
-      Direction grob_dir = to_dir (cause->get_property ("direction"));
-
-      // If we have an explicit direction for the new dynamic grob
-      // that differs from the current line spanner, break the spanner
-      if (grob_dir && (line_dir != grob_dir))
-        {
-          finished_spanners_.push_back (span);
-          span = 0;
-          delete_cv_entry (share, id);
-        }
-    }
-
-  if (!span)
-    span = make_spanner ("DynamicLineSpanner", dynamic->self_scm ());
-  started_spanners_.push_back (span);
-
-  if (has_interface<Spanner> (dynamic))
-    {
-      Spanner *dynamic_span = info.spanner ();
-      started_.push_back (dynamic_span);
-      create_cv_entry (share, id, span, cause, dynamic_span->self_scm ());
-    }
+  debug_output ("something happening?");
+  if (has_interface<Spanner> (info.grob ()))
+    started_.push_back (info);
   else if (info.item ())
-    scripts_.push_back (info.item ());
+    started_.insert (started_.begin (), info);
   else
-    dynamic->programming_error ("unknown dynamic grob");
+    info.grob ()->programming_error ("unknown dynamic grob");
+}
 
-  Axis_group_interface::add_element (span, dynamic);
+void
+Dynamic_align_engraver::process_acknowledged ()
+{
+  update_my_cv_spanners ();
 
-  if (cause)
+  for (vsize i = 0; i < started_.size (); i++)
     {
+      Grob *dynamic = started_[i].grob ();
+      Stream_event *cause = started_[i].event_cause ();
+      assert (cause);
+
+      SCM id = dynamic->get_property ("spanner-id");
+      Context *share = get_share_context (dynamic->get_property ("spanner-share-context"));
+      debug_output ("dynamicline started " + ly_scm2string (scm_object_to_string (id, SCM_UNDEFINED)) + " " + share->context_name ());
+      // ...
+      bool reuse = false;
+      SCM entry = get_cv_entry (share, id);
+      if (scm_is_pair (entry))
+        {
+          SCM other = get_cv_entry_other (entry);
+          if (scm_is_null (other))
+            {
+              // We can reuse this DynamicLineSpanner unless the direction conflicts
+              Direction line_dir = get_grob_direction (my_cv_spanners_[i]);
+              Direction grob_dir = to_dir (
+                cause->get_property ("direction"));
+
+              // If we have an explicit direction for the new dynamic grob
+              // that differs from the current line spanner, break it
+              reuse = !grob_dir || line_dir == grob_dir;
+            }
+          else
+            programming_error ("Simultaneous dynamics with same spanner-id");
+        }
+
+      SCM dynamic_scm;
+      Item *left_bound, *right_bound;
+      if (has_interface<Spanner> (dynamic))
+        {
+          Spanner *dynamic_span = started_[i].spanner ();
+          dynamic_scm = dynamic_span->self_scm ();
+          left_bound = dynamic_span->get_bound (LEFT);
+          right_bound = dynamic_span->get_bound (RIGHT);
+        }
+      else
+        {
+          dynamic_scm = SCM_EOL;
+          left_bound = right_bound = started_[i].item ();
+        }
+
+      Spanner *span;
+      if (reuse)
+        {
+          span = get_cv_entry_spanner (entry);
+          set_cv_entry_other (share, id, entry, dynamic_scm);
+        }
+      else
+        {
+          span = make_spanner ("DynamicLineSpanner", cause->self_scm ());
+          create_cv_entry (share, id, span, cause, dynamic_scm);
+        }
+      debug_output (string ("reuse is ") + (reuse ? "TRUE" : "FALSE"));
+
+      span->set_bound (LEFT, left_bound);
+      span->set_bound (RIGHT, right_bound);
+
+      Axis_group_interface::add_element (span, dynamic);
       if (Direction d = to_dir (cause->get_property ("direction")))
         set_grob_direction (span, d);
     }
 }
 
 void
-Dynamic_align_engraver::set_spanner_bounds (Spanner *line, bool end)
-{
-  if (!line)
-    return;
-
-  for (LEFT_and_RIGHT (d))
-    {
-      if ((d == LEFT && !line->get_bound (LEFT))
-          || (end && d == RIGHT && !line->get_bound (RIGHT)))
-        {
-          vector<Spanner *> const &spanners
-            = (d == LEFT) ? started_ : ended_;
-
-          Grob *bound = 0;
-          if (scripts_.size ())
-            bound = scripts_[0];
-          else if (spanners.size ())
-            bound = spanners[0]->get_bound (d);
-          else
-            {
-              bound = unsmob<Grob> (get_property ("currentMusicalColumn"));
-              programming_error ("started DynamicLineSpanner but have no left bound");
-            }
-
-          line->set_bound (d, bound);
-        }
-    }
-}
-
-void
 Dynamic_align_engraver::stop_translation_timestep ()
 {
-//  if (ended_)
-//    {
-//      set<Spanner *>::iterator it = running_.find (ended_);
-//      if (it != running_.end ())
-//        running_.erase (it);
-//      else
-//        started_->programming_error ("lost track of this dynamic spanner");
-//    }
-
-  // Set the proper bounds for the current spanner and for a spanner that
-  // is ended now
-  for (vsize i = 0; i < finished_spanners_.size (); i++)
-    {
-      set_spanner_bounds (finished_spanners_[i], true);
-    }
-
   for (vsize i = 0; i < my_cv_spanners_.size (); i++)
     {
-      bool end = true;
-      for (vsize j = 0; j < started_spanners_.size (); j++)
-        {
-          if (started_spanners_[j] == my_cv_spanners_[i])
-            {
-              end = false;
-              break;
-            }
-        }
-      set_spanner_bounds (started_spanners_[i], end);
-
   // If the flag is set to break the spanner after the current child, don't
   // add any more support points (needed e.g. for style=none, where the
   // invisible spanner should NOT be shifted since we don't have a line).
-  bool spanner_broken = false;
-//                        && to_boolean (current_dynamic_spanner_->get_property ("spanner-broken"));
-  for (vsize j = 0; !spanner_broken && j < support_.size (); j++)
-    Side_position_interface::add_support (my_cv_spanners_[i], support_[j]);
+      bool spanner_broken = false;
+      SCM other = my_cv_spanners_other_[i];
+      if (!scm_is_null (other))
+        {
+          Spanner *dynamic = unsmob<Spanner> (other);
+          spanner_broken = to_boolean (dynamic->get_property ("spanner-broken"));
+        }
+      for (vsize j = 0; !spanner_broken && j < support_.size (); j++)
+        Side_position_interface::add_support (my_cv_spanners_[i], support_[j]);
 
-  if (end)
-    {
-      SCM id = my_cv_spanners_[i]->get_property ("spanner-id");
-      Context *share = get_share_context (my_cv_spanners_[i]->get_property ("spanner-share-context"));
-      delete_cv_entry (share, id);
-    }
+      if (scm_is_null (other))
+        {
+          SCM id = my_cv_spanners_[i]->get_property ("spanner-id");
+          Context *share = get_share_context (my_cv_spanners_[i]->get_property ("spanner-share-context"));
+          delete_cv_entry (share, id);
+        }
     }
 
-  started_spanners_.clear ();
-  finished_spanners_.clear ();
-  ended_.clear ();
   started_.clear ();
-  scripts_.clear ();
   support_.clear ();
 }
 

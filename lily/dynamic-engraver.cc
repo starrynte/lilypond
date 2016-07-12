@@ -198,6 +198,8 @@ Dynamic_engraver::process_music ()
         }
 
       spanner->set_property ("spanner-id", id);
+      Context *share = get_share_context (ev->get_property ("spanner-share-context"));
+      spanner->set_property ("spanner-share-context", share->context_name_symbol ());
 
       // if we have a break-dynamic-span event right after the start dynamic, break the new spanner immediately
       if (scm_is_true (scm_assoc_ref (end_new_spanner_, id)))
@@ -219,7 +221,6 @@ Dynamic_engraver::process_music ()
         }
 
       start_spanners.push_back (spanner);
-      Context *share = get_share_context (ev->get_property ("spanner-share-context"));
       debug_output ("announcing start cv spanner from share " + share->context_name ());
       // Add spanner to sharedSpanners
       if (scm_is_pair (get_cv_entry (share, id)))
