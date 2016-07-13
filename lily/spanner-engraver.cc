@@ -103,6 +103,7 @@ Spanner_engraver::create_cv_entry (Context *share_context, SCM spanner_id,
   share_context->set_property ("sharedSpanners",
     scm_acons (key, entry, s));
   my_cv_spanners_.push_back (spanner);
+  my_cv_spanners_other_.push_back (other);
 }
 
 void
