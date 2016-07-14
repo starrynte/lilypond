@@ -1,3 +1,4 @@
+// TODO share context change?
 /*
   This file is part of LilyPond, the GNU music typesetter.
 
@@ -78,9 +79,16 @@ Dynamic_align_engraver::acknowledge_end_dynamic (Grob_info info)
       SCM other = get_cv_entry_other (entry);
       if (!scm_is_null (other) && unsmob<Spanner> (other) == dynamic)
         {
-          set_cv_entry_context (share, id, entry);
-          set_cv_entry_other (share, id, entry, SCM_EOL);
           right_bounds_[get_cv_entry_spanner (entry)] = info;
+          if (to_boolean (dynamic->get_property ("spanner-broken")))
+            {
+              delete_cv_entry (share, id);
+            }
+          else
+            {
+              set_cv_entry_context (share, id, entry);
+              set_cv_entry_other (share, id, entry, SCM_EOL);
+            }
           return;
         }
     }
@@ -152,6 +160,10 @@ Dynamic_align_engraver::process_acknowledged ()
 
               // If we have an explicit direction for the new dynamic grob
               // that differs from the current line spanner, break it
+              if (grob_dir && line_dir != grob_dir)
+                delete_cv_entry (share, id);
+              else
+                reuse = true;
               reuse = !grob_dir || line_dir == grob_dir;
             }
           else
@@ -176,12 +188,16 @@ Dynamic_align_engraver::process_acknowledged ()
           left_bounds_[span] = started_[i];
           create_cv_entry (share, id, span, cause, dynamic_scm);
         }
+      if (!has_interface<Spanner> (dynamic))
+        right_bounds_[span] = started_[i];
 
       Axis_group_interface::add_element (span, dynamic);
       if (Direction d = to_dir (cause->get_property ("direction")))
         set_grob_direction (span, d);
     }
 
+  // TODO more elegant way of handling this
+  update_my_cv_spanners ();
   started_.clear ();
 }
 
