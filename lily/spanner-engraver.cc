@@ -3,11 +3,10 @@
 #include "spanner-engraver.hh"
 #include "std-vector.hh"
 
-void
-Spanner_engraver::update_my_cv_spanners ()
+vector<cv_entry>
+Spanner_engraver::my_cv_entries ()
 {
-  my_cv_spanners_.clear ();
-  my_cv_spanners_other_.clear ();
+  vector<cv_entry> entries;
   SCM my_context = context ()->self_scm ();
   SCM my_class = ly_symbol2scm (class_name ());
   for (Context *c = context (); c != NULL; c = c->get_parent_context ())
@@ -15,6 +14,7 @@ Spanner_engraver::update_my_cv_spanners ()
       SCM s;
       if (!c->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
         continue;
+
       for (; scm_is_pair (s); s = scm_cdr (s))
         {
           SCM clazz = scm_caaar (s);
@@ -22,11 +22,11 @@ Spanner_engraver::update_my_cv_spanners ()
           if (ly_is_equal (scm_list_ref (entry, scm_from_int (0)), my_context)
               && ly_is_equal (clazz, my_class))
             {
-              my_cv_spanners_.push_back (get_cv_entry_spanner (entry));
-              my_cv_spanners_other_.push_back (get_cv_entry_other (entry));
+              entries.push_back (cv_entry (entry, c));
             }
         }
     }
+  return entries;
 }
 
 Context *
@@ -102,8 +102,6 @@ Spanner_engraver::create_cv_entry (Context *share_context, SCM spanner_id,
   SCM key = scm_cons (ly_symbol2scm (class_name ()), spanner_id);
   share_context->set_property ("sharedSpanners",
     scm_acons (key, entry, s));
-  my_cv_spanners_.push_back (spanner);
-  my_cv_spanners_other_.push_back (other);
 }
 
 void

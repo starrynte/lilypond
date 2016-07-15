@@ -133,8 +133,6 @@ Dynamic_engraver::get_property_setting (Stream_event *evt,
 void
 Dynamic_engraver::process_music ()
 {
-  update_my_cv_spanners ();
-
   // All events that end: stop events, start events, script event
   vector<Stream_event *> enders = stop_events_;
   enders.insert (enders.end (), start_events_.begin (), start_events_.end ());
@@ -198,8 +196,6 @@ Dynamic_engraver::process_music ()
         }
 
       spanner->set_property ("spanner-id", id);
-      Context *share = get_share_context (ev->get_property ("spanner-share-context"));
-      spanner->set_property ("spanner-share-context", share->context_name_symbol ());
 
       // if we have a break-dynamic-span event right after the start dynamic, break the new spanner immediately
       if (scm_is_true (scm_assoc_ref (end_new_spanner_, id)))
@@ -221,6 +217,7 @@ Dynamic_engraver::process_music ()
         }
 
       start_spanners.push_back (spanner);
+      Context *share = get_share_context (ev->get_property ("spanner-share-context"));
       debug_output ("announcing start cv spanner from share " + share->context_name ());
       // Add spanner to sharedSpanners
       if (scm_is_pair (get_cv_entry (share, id)))
@@ -254,10 +251,12 @@ Dynamic_engraver::stop_translation_timestep ()
                      unsmob<Grob> (get_property ("currentMusicalColumn")));
     }
 
-  for (vsize i = 0; i < my_cv_spanners_.size (); i++)
+  vector<cv_entry> entries = my_cv_entries ();
+  for (vsize i = 0; i < entries.size (); i++)
     {
-        if (!my_cv_spanners_[i]->get_bound (LEFT))
-          my_cv_spanners_[i]->set_bound (LEFT, unsmob<Grob> (get_property ("currentMusicalColumn")));
+      Spanner *span = get_cv_entry_spanner (entries[i].first);
+      if (!span->get_bound (LEFT))
+        span->set_bound (LEFT, unsmob<Grob> (get_property ("currentMusicalColumn")));
     }
 
   script_ = 0;
@@ -301,10 +300,12 @@ Dynamic_engraver::acknowledge_note_column (Grob_info info)
         script_->set_parent (x_parent, X_AXIS);
     }
 
-  for (vsize i = 0; i < my_cv_spanners_.size (); i++)
+  vector<cv_entry> entries = my_cv_entries ();
+  for (vsize i = 0; i < entries.size (); i++)
     {
-      if (!my_cv_spanners_[i]->get_bound (LEFT))
-        my_cv_spanners_[i]->set_bound (LEFT, info.grob ());
+      Spanner *span = get_cv_entry_spanner (entries[i].first);
+      if (!span->get_bound (LEFT))
+        span->set_bound (LEFT, info.grob ());
     }
   for (vsize i = 0; i < finished_spanners_.size (); i++)
     {

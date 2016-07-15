@@ -1,24 +1,20 @@
 #include "engraver.hh"
 #include "std-vector.hh"
+#include <utility>
 
 // Context property sharedSpanners is an alist:
 // (((engraver-class-name . spanner-id) . entry) etc)
 // entry: (voice spanner event other)
 // other: extra information formatted as an SCM in C++
 
+typedef pair<SCM, Context *> cv_entry;
+
 class Context;
 class Stream_event;
 class Spanner_engraver : public Engraver
 {
 protected:
-  // List of spanners in this voice: avoid repeatedly looking up properties
-  vector<Spanner *> my_cv_spanners_;
-  // Corresponding "other information"
-  vector<SCM> my_cv_spanners_other_;
-
-  // Update the list of spanners currently part of this voice
-  // This should run at the beginning of every process_music ()
-  void update_my_cv_spanners ();
+  vector<cv_entry> my_cv_entries ();
 
   Context *get_share_context (SCM s);
 
@@ -40,7 +36,6 @@ protected:
   void delete_cv_entry (Context *share_context, SCM spanner_id);
 
   // Create entry in share_context's sharedSpanners property
-  // Also adds spanner to my_cv_spanners_
   void create_cv_entry (Context *share_context, SCM spanner_id, Spanner *spanner,
                         Stream_event *event, SCM other = SCM_EOL);
 
