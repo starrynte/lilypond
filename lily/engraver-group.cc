@@ -95,13 +95,8 @@ void
 Engraver_group::announce_grob (Grob_info info, Direction dir,
                                Context *reroute_context)
 {
-//  if (info.grob ()->name () == "Hairpin" && context ()->context_name () == "Voice")
-//    { }
-//  else
-    {
-      announce_infos_.push_back (Announce_grob_info (info, dir));
-      debug_output (info.grob ()->name () + (dir == START ? " START" : " END") + " announced to context " + context ()->context_name ());
-    }
+  announce_infos_.push_back (Announce_grob_info (info, dir));
+  debug_output (info.grob ()->name () + (dir == START ? " START" : " END") + " announced to context " + context ()->context_name ());
 
   Context *dad_con = reroute_context ? reroute_context
     : context_->get_parent_context ();

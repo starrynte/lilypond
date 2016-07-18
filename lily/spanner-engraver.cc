@@ -1,6 +1,7 @@
 #include "context.hh"
 #include "spanner.hh"
 #include "spanner-engraver.hh"
+#include "std-string.hh"
 #include "std-vector.hh"
 
 vector<cv_entry>
@@ -53,17 +54,29 @@ Spanner_engraver::get_cv_entry_spanner (SCM entry)
   return unsmob<Spanner> (scm_list_ref (entry, scm_from_int (1)));
 }
 
+Stream_event *
+Spanner_engraver::get_cv_entry_event (SCM entry)
+{
+  return unsmob<Stream_event> (scm_list_ref (entry, scm_from_int (2)));
+}
+
+string
+Spanner_engraver::get_cv_entry_name (SCM entry)
+{
+  return ly_scm2string (scm_list_ref (entry, scm_from_int (3)));
+}
+
 SCM
 Spanner_engraver::get_cv_entry_other (SCM entry)
 {
-  return scm_list_ref (entry, scm_from_int (3));
+  return scm_list_ref (entry, scm_from_int (4));
 }
 
 void
 Spanner_engraver::set_cv_entry_other (Context *share_context, SCM spanner_id,
                                       SCM entry, SCM other)
 {
-  scm_list_set_x (entry, scm_from_int (3), other);
+  scm_list_set_x (entry, scm_from_int (4), other);
   set_cv_entry (share_context, spanner_id, entry);
 }
 
@@ -90,10 +103,10 @@ Spanner_engraver::delete_cv_entry (Context *share_context, SCM spanner_id)
 void
 Spanner_engraver::create_cv_entry (Context *share_context, SCM spanner_id,
                                    Spanner *spanner, Stream_event *event,
-                                   SCM other)
+                                   string name, SCM other)
 {
-  SCM entry = scm_list_4 (context ()->self_scm (), spanner->self_scm (),
-    event->self_scm (), other);
+  SCM entry = scm_list_5 (context ()->self_scm (), spanner->self_scm (),
+    event->self_scm (), ly_string2scm (name), other);
 
   SCM s;
   if (!share_context->here_defined (ly_symbol2scm ("sharedSpanners"), &s))

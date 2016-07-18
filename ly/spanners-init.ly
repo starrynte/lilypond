@@ -13,9 +13,18 @@ or parallel slurs or phrasing slurs within a single @code{Voice}.
   (if (key-list? id-and-share)
     (let ((len (length id-and-share)))
       (if (> len 2) (ly:warning "warning"))
-      (set! (ly:music-property event 'spanner-id) (car id-and-share))
-      (set! (ly:music-property event 'spanner-share-context)
-        (if (> len 1) (list-ref id-and-share 1) 'Voice))
+      (if (> len 1)
+        (begin
+          (set! (ly:music-property event 'spanner-share-context)
+            (list-ref id-and-share 0))
+          (set! (ly:music-property event 'spanner-id)
+            (list-ref id-and-share 1))
+        )
+        (begin
+          (set! (ly:music-property event 'spanner-share-context) 'Voice)
+          (set! (ly:music-property event 'spanner-id) (list-ref id-and-share 0))
+        )
+      )
     )
     (begin
       (set! (ly:music-property event 'spanner-id) id-and-share)

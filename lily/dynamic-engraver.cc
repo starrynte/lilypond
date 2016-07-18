@@ -31,8 +31,6 @@
 #include "stream-event.hh"
 #include "text-interface.hh"
 
-#include <map>
-
 #include "translator.icc"
 
 class Dynamic_engraver : public Spanner_engraver
@@ -58,7 +56,7 @@ private:
 
   Item *script_;
   Stream_event *script_event_;
-  // alist: (spanner-id boolean)
+  // alist: (spanner-id . boolean)
   SCM end_new_spanner_;
 };
 
@@ -82,10 +80,16 @@ Dynamic_engraver::listen_span_dynamic (Stream_event *ev)
   SCM id = ev->get_property ("spanner-id");
   debug_output (string("received: ") + (d == START ? "START" : "STOP") + ", id " + ly_scm2string (scm_object_to_string (id, SCM_UNDEFINED)));
 
-  if (d == START)
-    start_events_.push_back (ev);
-  else if (d == STOP)
-    stop_events_.push_back (ev);
+  vector<Stream_event *>& events = (d == STOP) ? stop_events_ : start_events_;
+  for (vsize i = 0; i < events.size (); i++)
+    {
+      if (ly_is_equal (events[i]->get_property ("spanner-id"), id))
+        {
+          ev->origin ()->warning ("Ignoring duplicate span dynamic event");
+          return;
+        }
+    }
+  events.push_back (ev);
 }
 
 void
@@ -133,6 +137,7 @@ Dynamic_engraver::get_property_setting (Stream_event *evt,
 void
 Dynamic_engraver::process_music ()
 {
+  // Check for ended spanners
   // All events that end: stop events, start events, script event
   vector<Stream_event *> enders = stop_events_;
   enders.insert (enders.end (), start_events_.begin (), start_events_.end ());
@@ -156,6 +161,7 @@ Dynamic_engraver::process_music ()
         }
     }
 
+  // Create new spanners
   vector<Spanner *> start_spanners;
   for (vsize i = 0; i < start_events_.size (); i++)
     {
@@ -198,7 +204,7 @@ Dynamic_engraver::process_music ()
       spanner->set_property ("spanner-id", id);
 
       // if we have a break-dynamic-span event right after the start dynamic, break the new spanner immediately
-      if (scm_is_true (scm_assoc_ref (end_new_spanner_, id)))
+      if (to_boolean (scm_assoc_ref (end_new_spanner_, id)))
         {
           spanner->set_property ("spanner-broken", SCM_BOOL_T);
           end_new_spanner_ = scm_assoc_remove_x (end_new_spanner_, id);
@@ -220,11 +226,7 @@ Dynamic_engraver::process_music ()
       Context *share = get_share_context (ev->get_property ("spanner-share-context"));
       debug_output ("announcing start cv spanner from share " + share->context_name ());
       // Add spanner to sharedSpanners
-      if (scm_is_pair (get_cv_entry (share, id)))
-        {
-          // spanner with this id already exists, warning?
-        }
-      create_cv_entry (share, id, spanner, ev);
+      create_cv_entry (share, id, spanner, ev, get_spanner_type (ev));
     }
 
   if (script_event_)
@@ -256,7 +258,9 @@ Dynamic_engraver::stop_translation_timestep ()
     {
       Spanner *span = get_cv_entry_spanner (entries[i].first);
       if (!span->get_bound (LEFT))
-        span->set_bound (LEFT, unsmob<Grob> (get_property ("currentMusicalColumn")));
+        span
+        ->set_bound (LEFT,
+                     unsmob<Grob> (get_property ("currentMusicalColumn")));
     }
 
   script_ = 0;
