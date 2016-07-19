@@ -36,7 +36,7 @@
 // Current approach to cross voice dynamics: dynamics immediately adjacent with
 // the same spanner-id/spanner-share-context will be connected in a line
 // The "other" field in the Spanner_engraver entries keeps track of the last
-// unended dynamic in each DynamicLineSpanner
+// unended dynamic spanner in each DynamicLineSpanner
 // If it is null at the end of a step, that line has no more dynamics and ends
 class Dynamic_align_engraver : public Spanner_engraver
 {
@@ -44,7 +44,6 @@ class Dynamic_align_engraver : public Spanner_engraver
   void acknowledge_rhythmic_head (Grob_info);
   void acknowledge_stem (Grob_info);
   void acknowledge_dynamic (Grob_info);
-  void acknowledge_footnote_spanner (Grob_info);
   void acknowledge_end_dynamic (Grob_info);
 
 protected:
@@ -58,7 +57,6 @@ private:
   // DynamicLineSpanners whose bounds will be set at the end of each step
   vector< pair<Spanner *, Grob_info> > left_bounds_;
   vector< pair<Spanner *, Grob_info> > right_bounds_;
-  vector<Grob *> footnotes_;
   vector<Grob *> support_;
 };
 
@@ -104,20 +102,6 @@ Dynamic_align_engraver::acknowledge_end_dynamic (Grob_info info)
         }
     }
   programming_error ("lost track of this dynamic spanner");
-}
-
-void
-Dynamic_align_engraver::acknowledge_footnote_spanner (Grob_info info)
-{
-  Grob *grob = info.grob ();
-  Grob *parent = grob->get_parent (Y_AXIS);
-
-  if (parent
-      && parent->internal_has_interface (ly_symbol2scm ("dynamic-interface")))
-    {
-      // TODO
-      footnotes_.push_back (grob);
-    }
 }
 
 void
@@ -198,12 +182,13 @@ Dynamic_align_engraver::process_acknowledged ()
       else
         {
           // Make a new line spanner
-          span = make_spanner ("DynamicLineSpanner", cause->self_scm ());
+          span = make_spanner ("DynamicLineSpanner", dynamic->self_scm ());
           span->set_property ("spanner-id", id);
           left_bounds_.push_back (
             pair<Spanner *, Grob_info> (span, started_[i]));
           create_cv_entry (share, id, span, cause, "", dynamic_scm);
         }
+      // If dynamic is a script, set the right bound
       if (!has_interface<Spanner> (dynamic))
         right_bounds_.push_back (
           pair<Spanner *, Grob_info> (span, started_[i]));
@@ -268,7 +253,6 @@ Dynamic_align_engraver::boot ()
   ADD_ACKNOWLEDGER (Dynamic_align_engraver, dynamic);
   ADD_ACKNOWLEDGER (Dynamic_align_engraver, rhythmic_head);
   ADD_ACKNOWLEDGER (Dynamic_align_engraver, stem);
-  ADD_ACKNOWLEDGER (Dynamic_align_engraver, footnote_spanner);
   ADD_END_ACKNOWLEDGER (Dynamic_align_engraver, dynamic);
 }
 
