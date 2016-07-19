@@ -1,18 +1,39 @@
 \version "2.19.29"
 
 "\\=" =
-#(define-event-function (id event) (number-or-string? ly:event?)
-  (_i "This sets the @code{spanner-id} property of the following
-@var{event} to the given @var{id} (numbers will be converted to a
-string).  This can be used to tell LilyPond how to connect overlapping
-or parallel slurs or phrasing slurs within a single @code{Voice}.
+#(define-event-function (id-and-share event) (key-list-or-symbol? ly:event?)
+  (_i "This sets the @code{spanner-id} and @code{spanner-share-context}
+properties of the following @var{event}. @var{id-and-share} is expected to be a
+key-list. If it has one element, @code{spanner-id} is set to that key and
+@code{spanner-share-context} to @code{'Voice}. If two elements are given,
+@code{spanner-share-context} is set to the first element and @code{spanner-id}
+to the second. This can be used to tell LilyPond how to connect overlapping or
+parallel slurs or phrasing slurs within a single @code{Voice}.
 @lilypond[quote,verbatim]
 \\fixed c' { c\\=1( d\\=2( e\\=1) f\\=2) }
 @end lilypond\n")
-  (set! (ly:music-property event 'spanner-id)
-	(if (number? id)
-	    (number->string id)
-	    id))
+  (if (key-list? id-and-share)
+    (let ((len (length id-and-share)))
+      (if (> len 2)
+        (ly:warning "Expected only two elements in argument to \\="))
+      (if (> len 1)
+        (begin
+          (set! (ly:music-property event 'spanner-share-context)
+            (list-ref id-and-share 0))
+          (set! (ly:music-property event 'spanner-id)
+            (list-ref id-and-share 1))
+        )
+        (begin
+          (set! (ly:music-property event 'spanner-share-context) 'Voice)
+          (set! (ly:music-property event 'spanner-id) (list-ref id-and-share 0))
+        )
+      )
+    )
+    (begin
+      (set! (ly:music-property event 'spanner-id) id-and-share)
+      (set! (ly:music-property event 'spanner-share-context) 'Voice)
+    )
+  )
   event)
 
 startGroup = #(make-span-event 'NoteGroupingEvent START)
