@@ -753,6 +753,8 @@ is not set")
      (scriptDefinitions ,list? "The description of scripts.  This is
 used by the @code{Script_engraver} for typesetting note-superscripts
 and subscripts.  See @file{scm/@/script.scm} for more information.")
+     (sharedSpanners ,list? "An alist storing information for cross
+voice spanners. See @file{lily/include/spanner-engraver.hh}.")
      (slurMelismaBusy ,boolean? "Signal if a slur is present.")
      (stavesFound ,grob-list? "A list of all staff-symbols found.")
 

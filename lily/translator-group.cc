@@ -33,6 +33,9 @@
 #include "performer-group.hh"
 #include "scheme-engraver.hh"
 #include "scm-hash.hh"
+#include "spanner.hh"
+#include "spanner-engraver.hh"
+#include "stream-event.hh"
 #include "warn.hh"
 
 void
@@ -84,6 +87,26 @@ Translator_group::disconnect_from_context ()
 void
 Translator_group::finalize ()
 {
+  SCM s;
+  if (!context_->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
+    return;
+
+  for (; scm_is_pair (s); s = scm_cdr (s))
+    {
+      SCM entry = scm_cdar (s);
+      string name = Spanner_engraver::get_cv_entry_name (entry);
+      // Don't warn for spanners with no names
+      if (name == "")
+        continue;
+      Spanner *span = Spanner_engraver::get_cv_entry_spanner (entry);
+      Stream_event *event = Spanner_engraver::get_cv_entry_event (entry);
+      if (span->is_live ())
+        {
+          event->origin ()->warning (_f ("unterminated %s", name));
+          span->suicide ();
+        }
+    }
+  context_->unset_property (ly_symbol2scm ("sharedSpanners"));
 }
 
 /*
