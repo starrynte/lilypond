@@ -2,17 +2,20 @@
 
 "\\=" =
 #(define-event-function (id-and-share event) (key-list-or-symbol? ly:event?)
-; TODO edit documentation
-  (_i "This sets the @code{spanner-id} property of the following
-@var{event} to the given @var{id} (numbers will be converted to a
-string).  This can be used to tell LilyPond how to connect overlapping
-or parallel slurs or phrasing slurs within a single @code{Voice}.
+  (_i "This sets the @code{spanner-id} and @code{spanner-share-context}
+properties of the following @var{event}. @var{id-and-share} is expected to be a
+key-list. If it has one element, @code{spanner-id} is set to that key and
+@code{spanner-share-context} to @code{'Voice}. If two elements are given,
+@code{spanner-share-context} is set to the first element and @code{spanner-id}
+to the second. This can be used to tell LilyPond how to connect overlapping or
+parallel slurs or phrasing slurs within a single @code{Voice}.
 @lilypond[quote,verbatim]
 \\fixed c' { c\\=1( d\\=2( e\\=1) f\\=2) }
 @end lilypond\n")
   (if (key-list? id-and-share)
     (let ((len (length id-and-share)))
-      (if (> len 2) (ly:warning "warning"))
+      (if (> len 2)
+        (ly:warning "Expected only two elements in argument to \\="))
       (if (> len 1)
         (begin
           (set! (ly:music-property event 'spanner-share-context)

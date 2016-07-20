@@ -80,7 +80,7 @@ Dynamic_engraver::listen_span_dynamic (Stream_event *ev)
   SCM id = ev->get_property ("spanner-id");
   debug_output (string("received: ") + (d == START ? "START" : "STOP") + ", id " + ly_scm2string (scm_object_to_string (id, SCM_UNDEFINED)));
 
-  vector<Stream_event *>& events = (d == STOP) ? stop_events_ : start_events_;
+  vector<Stream_event *> &events = (d == STOP) ? stop_events_ : start_events_;
   for (vsize i = 0; i < events.size (); i++)
     {
       if (ly_is_equal (events[i]->get_property ("spanner-id"), id))

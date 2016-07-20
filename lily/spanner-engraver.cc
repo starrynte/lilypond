@@ -97,7 +97,7 @@ Spanner_engraver::delete_cv_entry (Context *share_context, SCM spanner_id)
 
   SCM key = scm_cons (ly_symbol2scm (class_name ()), spanner_id);
   share_context->set_property ("sharedSpanners",
-    scm_assoc_remove_x (s, key));
+                               scm_assoc_remove_x (s, key));
 }
 
 void
@@ -106,7 +106,7 @@ Spanner_engraver::create_cv_entry (Context *share_context, SCM spanner_id,
                                    string name, SCM other)
 {
   SCM entry = scm_list_5 (context ()->self_scm (), spanner->self_scm (),
-    event->self_scm (), ly_string2scm (name), other);
+                          event->self_scm (), ly_string2scm (name), other);
 
   SCM s;
   if (!share_context->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
@@ -114,7 +114,7 @@ Spanner_engraver::create_cv_entry (Context *share_context, SCM spanner_id,
 
   SCM key = scm_cons (ly_symbol2scm (class_name ()), spanner_id);
   share_context->set_property ("sharedSpanners",
-    scm_acons (key, entry, s));
+                               scm_acons (key, entry, s));
 }
 
 void
@@ -127,5 +127,5 @@ Spanner_engraver::set_cv_entry (Context *share_context, SCM spanner_id,
 
   SCM key = scm_cons (ly_symbol2scm (class_name ()), spanner_id);
   share_context->set_property ("sharedSpanners",
-    scm_assoc_set_x (s, key, entry));
+                               scm_assoc_set_x (s, key, entry));
 }

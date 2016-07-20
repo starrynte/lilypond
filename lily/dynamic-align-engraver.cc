@@ -64,7 +64,6 @@ Dynamic_align_engraver::Dynamic_align_engraver ()
 {
 }
 
-
 void
 Dynamic_align_engraver::acknowledge_end_dynamic (Grob_info info)
 {
@@ -76,8 +75,7 @@ Dynamic_align_engraver::acknowledge_end_dynamic (Grob_info info)
   assert (cause);
   // Look for DynamicLineSpanner corresponding to the ended dynamic
   SCM id = dynamic->get_property ("spanner-id");
-  Context *share = get_share_context (
-    cause->get_property ("spanner-share-context"));
+  Context *share = get_share_context (cause->get_property ("spanner-share-context"));
   SCM entry = get_cv_entry (share, id);
   if (scm_is_pair (entry))
     {
@@ -85,8 +83,7 @@ Dynamic_align_engraver::acknowledge_end_dynamic (Grob_info info)
       SCM other = get_cv_entry_other (entry);
       if (!scm_is_null (other) && unsmob<Spanner> (other) == dynamic)
         {
-          right_bounds_.push_back (
-            pair<Spanner *, Grob_info> (get_cv_entry_spanner (entry), info));
+          right_bounds_.push_back (pair<Spanner *, Grob_info> (get_cv_entry_spanner (entry), info));
           if (to_boolean (dynamic->get_property ("spanner-broken")))
             {
               // Stop using this spanner if broken
@@ -150,10 +147,10 @@ Dynamic_align_engraver::process_acknowledged ()
           if (scm_is_null (other))
             {
               // We can reuse this line spanner unless the direction conflicts
-              Direction line_dir =
-                get_grob_direction (get_cv_entry_spanner (entry));
-              Direction grob_dir =
-                to_dir (cause->get_property ("direction"));
+              Direction line_dir
+                = get_grob_direction (get_cv_entry_spanner (entry));
+              Direction grob_dir
+                = to_dir (cause->get_property ("direction"));
 
               // If we have an explicit direction for the new dynamic grob
               // that differs from this line spanner, break it
@@ -168,9 +165,9 @@ Dynamic_align_engraver::process_acknowledged ()
 
       // The other field should be set to the new dynamic if it is a spanner
       // Otherwise, there is nothing to wait for, so it should be set to null
-      SCM dynamic_scm = has_interface<Spanner> (dynamic) ?
-        started_[i].spanner ()->self_scm () :
-        SCM_EOL;
+      SCM dynamic_scm = has_interface<Spanner> (dynamic)
+                        ? started_[i].spanner ()->self_scm ()
+                        : SCM_EOL;
 
       Spanner *span;
       if (reuse)
@@ -184,14 +181,12 @@ Dynamic_align_engraver::process_acknowledged ()
           // Make a new line spanner
           span = make_spanner ("DynamicLineSpanner", dynamic->self_scm ());
           span->set_property ("spanner-id", id);
-          left_bounds_.push_back (
-            pair<Spanner *, Grob_info> (span, started_[i]));
+          left_bounds_.push_back (pair<Spanner *, Grob_info> (span, started_[i]));
           create_cv_entry (share, id, span, cause, "", dynamic_scm);
         }
       // If dynamic is a script, set the right bound
       if (!has_interface<Spanner> (dynamic))
-        right_bounds_.push_back (
-          pair<Spanner *, Grob_info> (span, started_[i]));
+        right_bounds_.push_back (pair<Spanner *, Grob_info> (span, started_[i]));
 
       Axis_group_interface::add_element (span, dynamic);
       if (Direction d = to_dir (cause->get_property ("direction")))
@@ -241,9 +236,9 @@ void
 Dynamic_align_engraver::set_spanner_bound (Spanner *span, Direction d,
                                            Grob_info info)
 {
-  Item *bound = has_interface<Spanner> (info.grob ()) ?
-    info.spanner ()->get_bound (d) :
-    info.item ();
+  Item *bound = has_interface<Spanner> (info.grob ())
+                ? info.spanner ()->get_bound (d)
+                : info.item ();
   span->set_bound (d, bound);
 }
 

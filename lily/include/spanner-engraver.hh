@@ -16,6 +16,7 @@ class Stream_event;
 class Spanner_engraver : public Engraver
 {
 protected:
+  // Get spanner entries currently belonging to this voice
   vector<cv_entry> my_cv_entries ();
 
   Context *get_share_context (SCM s);

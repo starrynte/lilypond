@@ -106,7 +106,7 @@ Translator_group::finalize ()
           span->suicide ();
         }
     }
-    context_->unset_property (ly_symbol2scm ("sharedSpanners"));
+  context_->unset_property (ly_symbol2scm ("sharedSpanners"));
 }
 
 /*
