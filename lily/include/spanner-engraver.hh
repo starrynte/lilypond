@@ -5,7 +5,7 @@
 
 // Context property sharedSpanners is an alist:
 // (((engraver-class-name . spanner-id) . entry) etc)
-// entry: (voice spanner event name other)
+// entry: (voice spanner name other)
 // name: e.g. "crescendo"
 // other: extra information formatted as an SCM in C++
 
@@ -29,9 +29,6 @@ public:
   // Get Spanner pointer from entry
   static Spanner *get_cv_entry_spanner (SCM entry);
 
-  // Get spanner event from entry
-  static Stream_event *get_cv_entry_event (SCM entry);
-
   // Get spanner name from entry
   static string get_cv_entry_name (SCM entry);
 
@@ -49,7 +46,7 @@ protected:
 
   // Create entry in share_context's sharedSpanners property
   void create_cv_entry (Context *share_context, SCM spanner_id, Spanner *spanner,
-                        Stream_event *event, string name, SCM other = SCM_EOL);
+                        string name, SCM other = SCM_EOL);
 
 private:
   void set_cv_entry (Context *share_context, SCM spanner_id, SCM entry);

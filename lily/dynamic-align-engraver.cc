@@ -182,7 +182,7 @@ Dynamic_align_engraver::process_acknowledged ()
           span = make_spanner ("DynamicLineSpanner", dynamic->self_scm ());
           span->set_property ("spanner-id", id);
           left_bounds_.push_back (pair<Spanner *, Grob_info> (span, started_[i]));
-          create_cv_entry (share, id, span, cause, "", dynamic_scm);
+          create_cv_entry (share, id, span, "", dynamic_scm);
         }
       // If dynamic is a script, set the right bound
       if (!has_interface<Spanner> (dynamic))

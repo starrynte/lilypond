@@ -226,7 +226,7 @@ Dynamic_engraver::process_music ()
       Context *share = get_share_context (ev->get_property ("spanner-share-context"));
       debug_output ("announcing start cv spanner from share " + share->context_name ());
       // Add spanner to sharedSpanners
-      create_cv_entry (share, id, spanner, ev, get_spanner_type (ev));
+      create_cv_entry (share, id, spanner, get_spanner_type (ev));
     }
 
   if (script_event_)

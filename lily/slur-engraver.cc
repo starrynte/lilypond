@@ -25,6 +25,8 @@
 #include "slur-engraver.hh"
 #include "slur.hh"
 #include "spanner.hh"
+#include "spanner-engraver.hh"
+#include "std-vector.hh"
 #include "warn.hh"
 
 #include "translator.icc"
@@ -114,8 +116,12 @@ void
 Slur_engraver::listen_note_slur (Stream_event *ev, Stream_event *note)
 {
   Direction d = to_dir (ev->get_property ("span-direction"));
+  SCM id = ev->get_property ("spanner-id");
   if (d == START)
-    start_events_.push_back (Event_info (ev, note));
+    {
+      if (can_start_slur (id, ev))
+        start_events_.push_back (Event_info (ev, note));
+    }
   else if (d == STOP)
     stop_events_.push_back (Event_info (ev, note));
   else ev->origin ()->warning (_f ("direction of %s invalid: %d",
@@ -178,126 +184,83 @@ Slur_engraver::acknowledge_script (Grob_info info)
 }
 
 void
-Slur_engraver::finalize ()
+Slur_engraver::create_slur (Context *share, SCM spanner_id, Event_info evi, Direction dir)
 {
-  for (vsize i = 0; i < slurs_.size (); i++)
-    {
-      slurs_[i]->warning (_f ("unterminated %s", object_name ()));
-      slurs_[i]->suicide ();
-    }
-  slurs_.clear ();
-}
-
-void
-Slur_engraver::create_slur (SCM spanner_id, Event_info evi, Grob *g_cause, Direction dir, bool left_broken)
-{
-  Grob *ccc = left_broken
-    ? unsmob<Grob> (get_property ("currentCommandColumn"))
-    : 0; // efficiency
-  SCM cause = evi.slur_ ? evi.slur_->self_scm () : g_cause->self_scm ();
-  Spanner *slur = make_spanner (grob_symbol (), cause);
+  Spanner *slur = make_spanner (grob_symbol (), evi.slur_->self_scm ());
   slur->set_property ("spanner-id", spanner_id);
+  create_cv_entry (share, id, slur, object_name ());
   if (dir)
     set_grob_direction (slur, dir);
-  if (left_broken)
-    slur->set_bound (LEFT, ccc);
-  slurs_.push_back (slur);
   if (evi.note_)
     note_slurs_[START].insert (Note_slurs::value_type (evi.note_, slur));
-
-  if (double_property ())
-  {
-    set_grob_direction (slur, DOWN);
-    slur = make_spanner (grob_symbol (), cause);
-    slur->set_property ("spanner-id", spanner_id);
-    set_grob_direction (slur, UP);
-    if (left_broken)
-      slur->set_bound (LEFT, ccc);
-    slurs_.push_back (slur);
-    if (evi.note_)
-      note_slurs_[START].insert(Note_slurs::value_type (evi.note_, slur));
-  }
-
 }
 
 bool
-Slur_engraver::can_create_slur (SCM id, vsize old_slurs, vsize *event_idx, Stream_event *ev)
+Slur_engraver::can_start_slur (SCM id, Stream_event *ev)
 {
-  for (vsize j = slurs_.size (); j--;)
+  // Check for existing slur with same id
+  Context *share = get_share_context
+    (ev->get_property ("spanner-share-context"));
+  SCM entry = get_cv_entry (share, id);
+  if (scm_is_pair (entry))
     {
-      Grob *slur = slurs_[j];
-      Direction updown = to_dir (ev->get_property ("direction"));
+      // We already have an old slur, so give a warning
+      // and completely ignore the new slur.
+      ev->origin ()->warning (_f ("already have %s", object_name ()));
+      return false;
+    }
 
-      // Check if we already have a slur with the same spanner-id.
-      if (ly_is_equal (id, slur->get_property ("spanner-id")))
+  Direction updown = to_dir (ev->get_property ("direction"));
+  // Check for existing start event with same id
+  for (vsize i = 0; i < start_events_.size (); i++)
+    {
+      Stream_event *cause = start_events_[i];
+      if (ly_is_equal (id, cause->get_property ("spanner-id")))
         {
-          if (j < old_slurs)
-            {
-              // We already have an old slur, so give a warning
-              // and completely ignore the new slur.
-              ev->origin ()->warning (_f ("already have %s", object_name ()));
-              if (event_idx)
-                start_events_.erase (start_events_.begin () + (*event_idx));
-              return false;
-            }
-
           // If this slur event has no direction, it will not
-          // contribute anything new to the existing slur(s), so
+          // contribute anything new to the existing slur start, so
           // we can ignore it.
-
           if (!updown)
             return false;
 
-          Stream_event *c = unsmob<Stream_event> (slur->get_property ("cause"));
+          Direction slur_dir = to_dir (cause->get_property ("direction"));
 
-          if (!c)
-            {
-              slur->programming_error (_f ("%s without a cause", object_name ()));
-              return true;
-            }
-
-          Direction slur_dir = to_dir (c->get_property ("direction"));
-
-          // If the existing slur does not have a direction yet,
+          // If the existing slur start does not have a direction yet,
           // we'd rather take the new one.
-
           if (!slur_dir)
             {
-              slur->suicide ();
-              slurs_.erase (slurs_.begin () + j);
+              start_events_.erase (start_events_.begin () + j);
               return true;
             }
 
-          // If the existing slur has the same direction as ours, drop ours
-
-          if (slur_dir == updown)
-            return false;
+          // Otherwise, stick with the existing slur start.
+          return false;
         }
     }
+
   return true;
 }
 
+// TODO: handle double slurs, see 8a57f49
 bool
 Slur_engraver::try_to_end (Event_info evi)
 {
+  // Find the slur ended by this event (by checking the spanner-id)
   SCM id = evi.slur_->get_property ("spanner-id");
-
-  // Find the slurs that are ended with this event (by checking the spanner-id)
-  bool ended = false;
-  for (vsize j = slurs_.size (); j--;)
+  Context *share = get_share_context
+    (evi.slur_->get_property ("spanner-share-context"));
+  SCM entry = get_cv_entry (share, id);
+  if (scm_is_pair (entry))
     {
-      if (ly_is_equal (id, slurs_[j]->get_property ("spanner-id")))
-        {
-          ended = true;
-          end_slurs_.push_back (slurs_[j]);
-          if (evi.note_)
-            note_slurs_[STOP].insert
-              (Note_slurs::value_type
-               (evi.note_, dynamic_cast <Spanner *> (slurs_[j])));
-          slurs_.erase (slurs_.begin () + j);
-        }
+      Spanner *span = get_cv_entry_spanner (entry);
+      end_slurs_.push_back (span);
+      if (evi.note_)
+        note_slurs_[STOP].insert
+          (Note_slurs::value_type (evi.note_, span));
+      delete_cv_entry (share, id);
+      return true;
     }
-  return ended;
+  return false;
 }
 
 void
@@ -325,10 +288,17 @@ Slur_engraver::process_music ()
     {
       Stream_event *ev = start_events_[i].slur_;
       SCM id = ev->get_property ("spanner-id");
+      Context *share = get_share_context
+        (ev->get_property ("spanner-share-context"));
       Direction updown = to_dir (ev->get_property ("direction"));
 
-      if (can_create_slur (id, old_slurs, &i, ev))
-        create_slur (id, start_events_[i], 0, updown, false);
+      if (double_property ())
+        {
+          create_slur (share, id, start_events_[i], UP);
+          create_slur (share, id, start_events_[i], DOWN);
+        }
+      else
+        create_slur (share, id, start_events_[i], updown);
     }
 
   set_melisma (slurs_.size ());

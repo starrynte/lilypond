@@ -22,9 +22,10 @@
 #define SLUR_ENGRAVER_HH
 
 #include "engraver.hh"
+#include "spanner-engraver.hh"
 #include <map>
 
-class Slur_engraver : public Engraver
+class Slur_engraver : public Spanner_engraver
 {
 protected:
   struct Event_info {
@@ -39,7 +40,6 @@ protected:
 
   typedef std::multimap<Stream_event *, Spanner *> Note_slurs;
   Drul_array<Note_slurs> note_slurs_;
-  vector<Grob *> slurs_;
   vector<Grob *> end_slurs_;
   vector<Grob_info> objects_to_acknowledge_;
 
@@ -60,8 +60,8 @@ protected:
   void stop_translation_timestep ();
   void process_music ();
 
-  bool can_create_slur (SCM, vsize, vsize *, Stream_event *);
-  void create_slur (SCM spanner_id, Event_info evi, Grob *g_cause, Direction dir, bool left_broken);
+  bool can_start_slur (SCM, Stream_event *);
+  void create_slur (Context *share, SCM spanner_id, Event_info evi, Direction dir);
   bool try_to_end (Event_info evi);
 
   virtual void set_melisma (bool);
