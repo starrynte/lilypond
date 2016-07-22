@@ -145,8 +145,13 @@ void
 Slur_engraver::acknowledge_note_column (Grob_info info)
 {
   Grob *e = info.grob ();
-  for (vsize i = slurs_.size (); i--;)
-    Slur::add_column (slurs_[i], e);
+  vector<cv_entry> entries = my_cv_entries ();
+  for (vsize i = 0; i < entries.size (); i++)
+  {
+    vector<Spanner *> entry_slurs = get_cv_entry_spanners (entries[i].first);
+    for (vsize j = 0; j < entry_slurs.size (); j++)
+      Slur::add_column (entry_slurs[j], e);
+  }
   for (vsize i = end_slurs_.size (); i--;)
     Slur::add_column (end_slurs_[i], e);
   // Now cater for slurs starting/ending at a notehead: those override
@@ -183,18 +188,20 @@ Slur_engraver::acknowledge_script (Grob_info info)
     acknowledge_extra_object (info);
 }
 
-void
-Slur_engraver::create_slur (Context *share, SCM spanner_id, Event_info evi, Direction dir)
+Spanner *
+Slur_engraver::create_slur (SCM spanner_id, Event_info evi, Direction dir)
 {
   Spanner *slur = make_spanner (grob_symbol (), evi.slur_->self_scm ());
   slur->set_property ("spanner-id", spanner_id);
-  create_cv_entry (share, id, slur, object_name ());
   if (dir)
     set_grob_direction (slur, dir);
   if (evi.note_)
     note_slurs_[START].insert (Note_slurs::value_type (evi.note_, slur));
+  return slur;
 }
 
+// TODO: revert back to can_create_slur called from process_music
+// have to end slurs in process_music before checking if slur with same id exists
 bool
 Slur_engraver::can_start_slur (SCM id, Stream_event *ev)
 {
@@ -202,7 +209,7 @@ Slur_engraver::can_start_slur (SCM id, Stream_event *ev)
   Context *share = get_share_context
     (ev->get_property ("spanner-share-context"));
   SCM entry = get_cv_entry (share, id);
-  if (scm_is_pair (entry))
+  if (scm_is_vector (entry))
     {
       // We already have an old slur, so give a warning
       // and completely ignore the new slur.
@@ -214,7 +221,7 @@ Slur_engraver::can_start_slur (SCM id, Stream_event *ev)
   // Check for existing start event with same id
   for (vsize i = 0; i < start_events_.size (); i++)
     {
-      Stream_event *cause = start_events_[i];
+      Stream_event *cause = start_events_[i].slur_;
       if (ly_is_equal (id, cause->get_property ("spanner-id")))
         {
           // If this slur event has no direction, it will not
@@ -229,7 +236,7 @@ Slur_engraver::can_start_slur (SCM id, Stream_event *ev)
           // we'd rather take the new one.
           if (!slur_dir)
             {
-              start_events_.erase (start_events_.begin () + j);
+              start_events_.erase (start_events_.begin () + i);
               return true;
             }
 
@@ -241,22 +248,25 @@ Slur_engraver::can_start_slur (SCM id, Stream_event *ev)
   return true;
 }
 
-// TODO: handle double slurs, see 8a57f49
 bool
 Slur_engraver::try_to_end (Event_info evi)
 {
-  // Find the slur ended by this event (by checking the spanner-id)
   SCM id = evi.slur_->get_property ("spanner-id");
   Context *share = get_share_context
     (evi.slur_->get_property ("spanner-share-context"));
+
+  // Find the slurs that are ended with this event (by checking the spanner-id)
   SCM entry = get_cv_entry (share, id);
-  if (scm_is_pair (entry))
+  if (scm_is_vector (entry))
     {
-      Spanner *span = get_cv_entry_spanner (entry);
-      end_slurs_.push_back (span);
-      if (evi.note_)
-        note_slurs_[STOP].insert
-          (Note_slurs::value_type (evi.note_, span));
+      vector<Spanner *> slurs = get_cv_entry_spanners (entry);
+      for (vsize i = 0; i < slurs.size (); i++)
+        {
+          end_slurs_.push_back (slurs[i]);
+          if (evi.note_)
+            note_slurs_[STOP].insert
+              (Note_slurs::value_type (evi.note_, slurs[i]));
+        }
       delete_cv_entry (share, id);
       return true;
     }
@@ -283,7 +293,6 @@ Slur_engraver::process_music ()
         stop_events_[i].slur_->origin ()->warning (_f ("cannot end %s", object_name ()));
     }
 
-  vsize old_slurs = slurs_.size ();
   for (vsize i = start_events_.size (); i--;)
     {
       Stream_event *ev = start_events_[i].slur_;
@@ -294,27 +303,43 @@ Slur_engraver::process_music ()
 
       if (double_property ())
         {
-          create_slur (share, id, start_events_[i], UP);
-          create_slur (share, id, start_events_[i], DOWN);
+          vector<Spanner *> slurs;
+          slurs.push_back (create_slur (id, start_events_[i], UP));
+          slurs.push_back (create_slur (id, start_events_[i], DOWN));
+          create_cv_entry (share, id, slurs, object_name ());
         }
       else
-        create_slur (share, id, start_events_[i], updown);
+        {
+          Spanner *slur = create_slur (id, start_events_[i], updown);
+          create_cv_entry (share, id, slur, object_name ());
+        }
     }
 
-  set_melisma (slurs_.size ());
+  set_melisma (my_cv_entries ().size ());
 }
 
 void
 Slur_engraver::stop_translation_timestep ()
 {
+  vector<Grob *> slurs;
+  vector<cv_entry> entries = my_cv_entries ();
+  for (vsize i = 0; i < entries.size (); i++)
+  {
+    vector<Spanner *> entry_slurs = get_cv_entry_spanners (entries[i].first);
+    for (vsize j = 0; j < entry_slurs.size (); j++)
+      slurs.push_back (entry_slurs[j]);
+  }
+
   if (Grob *g = unsmob<Grob> (get_property ("currentCommandColumn")))
     {
       for (vsize i = 0; i < end_slurs_.size (); i++)
         Slur::add_extra_encompass (end_slurs_[i], g);
 
       if (!start_events_.size ())
-        for (vsize i = 0; i < slurs_.size (); i++)
-          Slur::add_extra_encompass (slurs_[i], g);
+        {
+          for (vsize i = 0; i < slurs.size (); i++)
+            Slur::add_extra_encompass (slurs[i], g);
+        }
     }
 
   for (vsize i = 0; i < end_slurs_.size (); i++)
@@ -326,7 +351,7 @@ Slur_engraver::stop_translation_timestep ()
     }
 
   for (vsize i = 0; i < objects_to_acknowledge_.size (); i++)
-    Slur::auxiliary_acknowledge_extra_object (objects_to_acknowledge_[i], slurs_, end_slurs_);
+    Slur::auxiliary_acknowledge_extra_object (objects_to_acknowledge_[i], slurs, end_slurs_);
 
   note_slurs_[LEFT].clear ();
   note_slurs_[RIGHT].clear ();

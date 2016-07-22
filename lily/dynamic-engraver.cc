@@ -114,7 +114,7 @@ Dynamic_engraver::listen_break_span (Stream_event *event)
 
       Context *share = get_share_context (event->get_property ("spanner-share-context"));
       SCM entry = get_cv_entry (share, id);
-      if (scm_is_pair (entry))
+      if (scm_is_vector (entry))
         {
           set_cv_entry_context (share, id, entry);
           Spanner *span = get_cv_entry_spanner (entry);
@@ -151,7 +151,7 @@ Dynamic_engraver::process_music ()
       SCM ender_id = ender->get_property ("spanner-id");
       Context *share = get_share_context (ender->get_property ("spanner-share-context"));
       SCM entry = get_cv_entry (share, ender_id);
-      if (scm_is_pair (entry))
+      if (scm_is_vector (entry))
         {
           Spanner *spanner = get_cv_entry_spanner (entry);
           finished_spanners_.push_back (spanner);

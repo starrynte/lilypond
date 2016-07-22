@@ -77,7 +77,7 @@ Dynamic_align_engraver::acknowledge_end_dynamic (Grob_info info)
   SCM id = dynamic->get_property ("spanner-id");
   Context *share = get_share_context (cause->get_property ("spanner-share-context"));
   SCM entry = get_cv_entry (share, id);
-  if (scm_is_pair (entry))
+  if (scm_is_vector (entry))
     {
       // The other field should have been set in the start acknowledgement
       SCM other = get_cv_entry_other (entry);
@@ -140,7 +140,7 @@ Dynamic_align_engraver::process_acknowledged ()
       bool reuse = false;
       // Check if such a line spanner already exists
       SCM entry = get_cv_entry (share, id);
-      if (scm_is_pair (entry))
+      if (scm_is_vector (entry))
         {
           // Check if the line spanner isn't waiting for a dynamic to end
           SCM other = get_cv_entry_other (entry);

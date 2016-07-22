@@ -61,11 +61,10 @@ protected:
   void process_music ();
 
   bool can_start_slur (SCM, Stream_event *);
-  void create_slur (Context *share, SCM spanner_id, Event_info evi, Direction dir);
+  Spanner *create_slur (SCM spanner_id, Event_info evi, Direction dir);
   bool try_to_end (Event_info evi);
 
   virtual void set_melisma (bool);
-  virtual void finalize ();
   virtual void derived_mark () const;
 
 public:

@@ -20,7 +20,7 @@ Spanner_engraver::my_cv_entries ()
         {
           SCM clazz = scm_caaar (s);
           SCM entry = scm_cdar (s);
-          if (ly_is_equal (scm_list_ref (entry, scm_from_int (0)), my_context)
+          if (ly_is_equal (scm_c_vector_ref (entry, 0), my_context)
               && ly_is_equal (clazz, my_class))
             {
               entries.push_back (cv_entry (entry, c));
@@ -44,33 +44,45 @@ Spanner_engraver::get_cv_entry (Context *share_context, SCM spanner_id)
   if (!share_context->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
     return SCM_EOL;
 
-  SCM key = scm_cons (ly_symbol2scm (class_name ()), spanner_id);
-  return scm_assoc_ref (s, key);
+  return scm_assoc_ref (s, key (spanner_id));
 }
 
 Spanner *
 Spanner_engraver::get_cv_entry_spanner (SCM entry)
 {
-  return unsmob<Spanner> (scm_list_ref (entry, scm_from_int (1)));
+  SCM spanner_list = scm_c_vector_ref (entry, 1);
+  return unsmob<Spanner> (scm_car (spanner_list));
+}
+
+vector<Spanner *>
+Spanner_engraver::get_cv_entry_spanners (SCM entry)
+{
+  vector<Spanner *> spanners;
+  for (SCM spanner_list = scm_c_vector_ref (entry, 1);
+       scm_is_pair (spanner_list); spanner_list = scm_cdr (spanner_list))
+    {
+      spanners.push_back (unsmob<Spanner> (scm_car (spanner_list)));
+    }
+  return spanners;
 }
 
 string
 Spanner_engraver::get_cv_entry_name (SCM entry)
 {
-  return ly_scm2string (scm_list_ref (entry, scm_from_int (2)));
+  return ly_scm2string (scm_c_vector_ref (entry, 2));
 }
 
 SCM
 Spanner_engraver::get_cv_entry_other (SCM entry)
 {
-  return scm_list_ref (entry, scm_from_int (3));
+  return scm_c_vector_ref (entry, 3);
 }
 
 void
 Spanner_engraver::set_cv_entry_other (Context *share_context, SCM spanner_id,
                                       SCM entry, SCM other)
 {
-  scm_list_set_x (entry, scm_from_int (3), other);
+  scm_c_vector_set_x (entry, 3, other);
   set_cv_entry (share_context, spanner_id, entry);
 }
 
@@ -78,7 +90,7 @@ void
 Spanner_engraver::set_cv_entry_context (Context *share_context,
                                         SCM spanner_id, SCM entry)
 {
-  scm_list_set_x (entry, scm_from_int (0), context ()->self_scm ());
+  scm_c_vector_set_x (entry, 0, context ()->self_scm ());
   set_cv_entry (share_context, spanner_id, entry);
 }
 
@@ -89,25 +101,35 @@ Spanner_engraver::delete_cv_entry (Context *share_context, SCM spanner_id)
   if (!share_context->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
     return;
 
-  SCM key = scm_cons (ly_symbol2scm (class_name ()), spanner_id);
   share_context->set_property ("sharedSpanners",
-                               scm_assoc_remove_x (s, key));
+                               scm_assoc_remove_x (s, key (spanner_id)));
 }
 
 void
 Spanner_engraver::create_cv_entry (Context *share_context, SCM spanner_id,
                                    Spanner *spanner, string name, SCM other)
 {
-  SCM entry = scm_list_4 (context ()->self_scm (), spanner->self_scm (),
-                          ly_string2scm (name), other);
+  vector<Spanner *> span_vector;
+  span_vector.push_back (spanner);
+  create_cv_entry (share_context, spanner_id, span_vector, name, other);
+}
+
+void
+Spanner_engraver::create_cv_entry (Context *share_context, SCM spanner_id,
+                                   vector<Spanner *> span_vector, string name, SCM other)
+{
+  SCM spanners = SCM_EOL;
+  for (vsize i = span_vector.size (); i--;)
+    spanners = scm_cons (span_vector[i]->self_scm (), spanners);
+  SCM entry = scm_vector (scm_list_4
+    (context ()->self_scm (), spanners, ly_string2scm (name), other));
 
   SCM s;
   if (!share_context->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
     s = SCM_EOL;
 
-  SCM key = scm_cons (ly_symbol2scm (class_name ()), spanner_id);
   share_context->set_property ("sharedSpanners",
-                               scm_acons (key, entry, s));
+                               scm_acons (key (spanner_id), entry, s));
 }
 
 void
@@ -118,7 +140,6 @@ Spanner_engraver::set_cv_entry (Context *share_context, SCM spanner_id,
   if (!share_context->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
     s = SCM_EOL;
 
-  SCM key = scm_cons (ly_symbol2scm (class_name ()), spanner_id);
   share_context->set_property ("sharedSpanners",
-                               scm_assoc_set_x (s, key, entry));
+                               scm_assoc_set_x (s, key (spanner_id), entry));
 }
