@@ -1,5 +1,4 @@
-
-\version "2.16.0"
+\version "2.19.46"
 \header{
   texidoc=" Dynamics appear below or above the staff.  If multiple
 dynamics are linked with (de)crescendi, they should be on the same
@@ -21,6 +20,9 @@ line. Isolated dynamics may be forced up or down.
   d\f
 
   a
-
 }
 
+<<
+  \relative { a'1\=Staff.1\fff\=Staff.1\> a } \\
+  \relative { c'1 c,\=Staff.1\!\=Staff.1\pp }
+>>

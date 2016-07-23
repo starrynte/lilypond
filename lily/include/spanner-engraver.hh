@@ -8,13 +8,13 @@
 
 // Context property sharedSpanners is an alist: ( (key . entry) etc )
 // key: (engraver-class-name . spanner-id)
-// entry: #(voice spanner-list name other)
+// entry: #(voice spanner-or-list name other)
 //   voice: Voice context that this spanner currently belongs to
 //   name: e.g. "crescendo"
 //   other: extra information formatted as an SCM in C++
-// spanner-list: (spanner spanner etc)
-//   Note that (within an engraver) a spanner-id may be associated with multiple
-//   spanners: this is needed in, e.g., double slurs
+// spanner-or-list: spanner OR (spanner spanner etc)
+//   If spanner-or-list is a list, the spanner-id is associated with multiple
+//   spanners. This is needed for, e.g., double slurs
 typedef pair<SCM, Context *> cv_entry;
 
 class Context;
@@ -32,9 +32,10 @@ protected:
   SCM get_cv_entry (Context *share_context, SCM spanner_id);
 
 public:
-  // Get first Spanner in spanner-list from entry
+  // Get Spanner from entry
+  // If spanner-or-list is a list, warn and return the first Spanner
   static Spanner *get_cv_entry_spanner (SCM entry);
-  // Get all Spanners in spanner-list
+  // Get all Spanners in spanner-or-list
   static vector<Spanner *> get_cv_entry_spanners (SCM entry);
 
   // Get spanner name from entry
@@ -57,12 +58,16 @@ protected:
   void create_cv_entry (Context *share_context, SCM spanner_id,
                         Spanner *spanner, string name, SCM other = SCM_EOL);
   void create_cv_entry (Context *share_context, SCM spanner_id,
-                        vector<Spanner *> span_vector, string name, SCM other = SCM_EOL);
+                        vector<Spanner *> spanners, string name, SCM other = SCM_EOL);
 
 private:
   inline SCM key (SCM spanner_id)
     { return scm_cons (ly_symbol2scm (class_name ()), spanner_id); }
+
   void set_cv_entry (Context *share_context, SCM spanner_id, SCM entry);
+
+  void create_cv_entry (Context *share_context, SCM spanner_id,
+                        SCM spanner_or_list, string name, SCM other = SCM_EOL);
 };
 
 #endif // SPANNER_ENGRAVER_HH

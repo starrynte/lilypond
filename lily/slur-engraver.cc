@@ -200,23 +200,9 @@ Slur_engraver::create_slur (SCM spanner_id, Event_info evi, Direction dir)
   return slur;
 }
 
-// TODO: revert back to can_create_slur called from process_music
-// have to end slurs in process_music before checking if slur with same id exists
 bool
 Slur_engraver::can_start_slur (SCM id, Stream_event *ev)
 {
-  // Check for existing slur with same id
-  Context *share = get_share_context
-    (ev->get_property ("spanner-share-context"));
-  SCM entry = get_cv_entry (share, id);
-  if (scm_is_vector (entry))
-    {
-      // We already have an old slur, so give a warning
-      // and completely ignore the new slur.
-      ev->origin ()->warning (_f ("already have %s", object_name ()));
-      return false;
-    }
-
   Direction updown = to_dir (ev->get_property ("direction"));
   // Check for existing start event with same id
   for (vsize i = 0; i < start_events_.size (); i++)
@@ -299,7 +285,15 @@ Slur_engraver::process_music ()
       SCM id = ev->get_property ("spanner-id");
       Context *share = get_share_context
         (ev->get_property ("spanner-share-context"));
-      Direction updown = to_dir (ev->get_property ("direction"));
+      // Check for existing slur with same id
+      if (scm_is_vector (get_cv_entry (share, id)))
+        {
+          // We already have an old slur, so give a warning
+          // and completely ignore the new slur.
+          ev->origin ()->warning (_f ("already have %s", object_name ()));
+          start_events_.erase (start_events_.begin () + i);
+          continue;
+        }
 
       if (double_property ())
         {
@@ -310,7 +304,8 @@ Slur_engraver::process_music ()
         }
       else
         {
-          Spanner *slur = create_slur (id, start_events_[i], updown);
+          Spanner *slur = create_slur
+            (id, start_events_[i], to_dir (ev->get_property ("direction")));
           create_cv_entry (share, id, slur, object_name ());
         }
     }

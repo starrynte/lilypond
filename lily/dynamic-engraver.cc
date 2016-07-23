@@ -78,7 +78,6 @@ Dynamic_engraver::listen_span_dynamic (Stream_event *ev)
 {
   Direction d = to_dir (ev->get_property ("span-direction"));
   SCM id = ev->get_property ("spanner-id");
-  debug_output (string("received: ") + (d == START ? "START" : "STOP") + ", id " + ly_scm2string (scm_object_to_string (id, SCM_UNDEFINED)));
 
   vector<Stream_event *> &events = (d == STOP) ? stop_events_ : start_events_;
   for (vsize i = 0; i < events.size (); i++)
@@ -107,12 +106,14 @@ Dynamic_engraver::listen_break_span (Stream_event *event)
         {
           if (ly_is_equal (start_events_[i]->get_property ("spanner-id"), id))
             {
-              end_new_spanner_ = scm_assoc_set_x (end_new_spanner_, id, SCM_BOOL_T);
+              end_new_spanner_ = scm_assoc_set_x
+                (end_new_spanner_, id, SCM_BOOL_T);
               return;
             }
         }
 
-      Context *share = get_share_context (event->get_property ("spanner-share-context"));
+      Context *share = get_share_context
+        (event->get_property ("spanner-share-context"));
       SCM entry = get_cv_entry (share, id);
       if (scm_is_vector (entry))
         {
@@ -149,13 +150,13 @@ Dynamic_engraver::process_music ()
       Stream_event *ender = enders[i];
 
       SCM ender_id = ender->get_property ("spanner-id");
-      Context *share = get_share_context (ender->get_property ("spanner-share-context"));
+      Context *share = get_share_context
+        (ender->get_property ("spanner-share-context"));
       SCM entry = get_cv_entry (share, ender_id);
       if (scm_is_vector (entry))
         {
           Spanner *spanner = get_cv_entry_spanner (entry);
           finished_spanners_.push_back (spanner);
-          debug_output ("announcing end cv spanner from share " + share->context_name ());
           announce_end_grob (spanner, ender->self_scm ());
           delete_cv_entry (share, ender_id);
         }
@@ -195,15 +196,17 @@ Dynamic_engraver::process_music ()
           if (!scm_is_eq (cresc_type, ly_symbol2scm ("hairpin")))
             {
               string as_string = ly_scm_write_string (cresc_type);
-              ev
-              ->origin ()->warning (_f ("unknown crescendo style: %s\ndefaulting to hairpin.", as_string.c_str ()));
+              ev->origin ()->warning (_f
+                ("unknown crescendo style: %s\ndefaulting to hairpin.",
+                 as_string.c_str ()));
             }
           spanner = make_spanner ("Hairpin", ev->self_scm ());
         }
 
       spanner->set_property ("spanner-id", id);
 
-      // if we have a break-dynamic-span event right after the start dynamic, break the new spanner immediately
+      // if we have a break-dynamic-span event right after the start dynamic,
+      // break the new spanner immediately
       if (to_boolean (scm_assoc_ref (end_new_spanner_, id)))
         {
           spanner->set_property ("spanner-broken", SCM_BOOL_T);
@@ -223,8 +226,8 @@ Dynamic_engraver::process_music ()
         }
 
       start_spanners.push_back (spanner);
-      Context *share = get_share_context (ev->get_property ("spanner-share-context"));
-      debug_output ("announcing start cv spanner from share " + share->context_name ());
+      Context *share = get_share_context
+        (ev->get_property ("spanner-share-context"));
       // Add spanner to sharedSpanners
       create_cv_entry (share, id, spanner, get_spanner_type (ev));
     }
