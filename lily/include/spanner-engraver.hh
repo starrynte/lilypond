@@ -46,7 +46,8 @@ public:
 
 protected:
   // Set entry's "other"
-  void set_cv_entry_other (Context *share_context, SCM spanner_id, SCM entry, SCM other);
+  void set_cv_entry_other (Context *share_context, SCM spanner_id, SCM entry,
+                           SCM other);
 
   // Set entry's context to this voice
   void set_cv_entry_context (Context *share_context, SCM spanner_id, SCM entry);
@@ -58,11 +59,12 @@ protected:
   void create_cv_entry (Context *share_context, SCM spanner_id,
                         Spanner *spanner, string name, SCM other = SCM_EOL);
   void create_cv_entry (Context *share_context, SCM spanner_id,
-                        vector<Spanner *> spanners, string name, SCM other = SCM_EOL);
+                        vector<Spanner *> spanners, string name,
+                        SCM other = SCM_EOL);
 
 private:
   inline SCM key (SCM spanner_id)
-    { return scm_cons (ly_symbol2scm (class_name ()), spanner_id); }
+  { return scm_cons (ly_symbol2scm (class_name ()), spanner_id); }
 
   void set_cv_entry (Context *share_context, SCM spanner_id, SCM entry);
 

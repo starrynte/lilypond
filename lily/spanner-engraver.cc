@@ -51,10 +51,12 @@ Spanner *
 Spanner_engraver::get_cv_entry_spanner (SCM entry)
 {
   SCM spanner_or_list = scm_c_vector_ref (entry, 1);
-  SCM spanner = scm_is_pair (spanner_or_list)
-    ? scm_car (spanner_or_list)
-    : spanner_or_list;
-  return unsmob<Spanner> (spanner);
+  if (scm_is_pair (spanner_or_list))
+    {
+      warning ("Requested one spanner when multiple present");
+      return unsmob<Spanner> (scm_car (spanner_or_list));
+    }
+  return unsmob<Spanner> (spanner_or_list);
 }
 
 vector<Spanner *>
@@ -136,9 +138,10 @@ void
 Spanner_engraver::create_cv_entry (Context *share_context, SCM spanner_id,
                                    SCM spanner_or_list, string name, SCM other)
 {
-  SCM entry = scm_vector (scm_list_4
-    (context ()->self_scm (), spanner_or_list, ly_string2scm (name), other));
-
+  SCM entry = scm_vector (scm_list_4 (context ()->self_scm (),
+                                      spanner_or_list,
+                                      ly_string2scm (name),
+                                      other));
   SCM s;
   if (!share_context->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
     s = SCM_EOL;

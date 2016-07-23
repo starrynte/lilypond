@@ -76,7 +76,7 @@ Dynamic_align_engraver::acknowledge_end_dynamic (Grob_info info)
   // Look for DynamicLineSpanner corresponding to the ended dynamic
   SCM id = dynamic->get_property ("spanner-id");
   Context *share = get_share_context
-    (cause->get_property ("spanner-share-context"));
+                   (cause->get_property ("spanner-share-context"));
   SCM entry = get_cv_entry (share, id);
   if (scm_is_vector (entry))
     {
@@ -85,7 +85,7 @@ Dynamic_align_engraver::acknowledge_end_dynamic (Grob_info info)
       if (!scm_is_null (other) && unsmob<Spanner> (other) == dynamic)
         {
           right_bounds_.push_back
-            (pair<Spanner *, Grob_info> (get_cv_entry_spanner (entry), info));
+          (pair<Spanner *, Grob_info> (get_cv_entry_spanner (entry), info));
           if (to_boolean (dynamic->get_property ("spanner-broken")))
             {
               // Stop using this spanner if broken
@@ -139,7 +139,7 @@ Dynamic_align_engraver::process_acknowledged ()
       // spanner-id or spanner-share-context properties
       SCM id = cause->get_property ("spanner-id");
       Context *share = get_share_context
-        (cause->get_property ("spanner-share-context"));
+                       (cause->get_property ("spanner-share-context"));
       // Whether or not an existing DynamicLineSpanner with matching
       // id/share context can be extended with this dynamic
       bool reuse = false;
@@ -187,13 +187,13 @@ Dynamic_align_engraver::process_acknowledged ()
           span = make_spanner ("DynamicLineSpanner", dynamic->self_scm ());
           span->set_property ("spanner-id", id);
           left_bounds_.push_back
-            (pair<Spanner *, Grob_info> (span, started_[i]));
+          (pair<Spanner *, Grob_info> (span, started_[i]));
           create_cv_entry (share, id, span, "", dynamic_scm);
         }
       // If dynamic is a script, set the right bound
       if (!has_interface<Spanner> (dynamic))
         right_bounds_.push_back
-          (pair<Spanner *, Grob_info> (span, started_[i]));
+        (pair<Spanner *, Grob_info> (span, started_[i]));
 
       Axis_group_interface::add_element (span, dynamic);
       if (Direction d = to_dir (cause->get_property ("direction")))
@@ -222,7 +222,7 @@ Dynamic_align_engraver::stop_translation_timestep ()
         {
           Spanner *dynamic = unsmob<Spanner> (other);
           spanner_broken = to_boolean
-            (dynamic->get_property ("spanner-broken"));
+                           (dynamic->get_property ("spanner-broken"));
         }
       // If the flag is set to break the spanner after the current child, don't
       // add any more support points (needed e.g. for style=none, where the

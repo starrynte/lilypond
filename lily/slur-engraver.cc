@@ -147,11 +147,11 @@ Slur_engraver::acknowledge_note_column (Grob_info info)
   Grob *e = info.grob ();
   vector<cv_entry> entries = my_cv_entries ();
   for (vsize i = 0; i < entries.size (); i++)
-  {
-    vector<Spanner *> entry_slurs = get_cv_entry_spanners (entries[i].first);
-    for (vsize j = 0; j < entry_slurs.size (); j++)
-      Slur::add_column (entry_slurs[j], e);
-  }
+    {
+      vector<Spanner *> entry_slurs = get_cv_entry_spanners (entries[i].first);
+      for (vsize j = 0; j < entry_slurs.size (); j++)
+        Slur::add_column (entry_slurs[j], e);
+    }
   for (vsize i = end_slurs_.size (); i--;)
     Slur::add_column (end_slurs_[i], e);
   // Now cater for slurs starting/ending at a notehead: those override
@@ -239,7 +239,7 @@ Slur_engraver::try_to_end (Event_info evi)
 {
   SCM id = evi.slur_->get_property ("spanner-id");
   Context *share = get_share_context
-    (evi.slur_->get_property ("spanner-share-context"));
+                   (evi.slur_->get_property ("spanner-share-context"));
 
   // Find the slurs that are ended with this event (by checking the spanner-id)
   SCM entry = get_cv_entry (share, id);
@@ -251,7 +251,7 @@ Slur_engraver::try_to_end (Event_info evi)
           end_slurs_.push_back (slurs[i]);
           if (evi.note_)
             note_slurs_[STOP].insert
-              (Note_slurs::value_type (evi.note_, slurs[i]));
+            (Note_slurs::value_type (evi.note_, slurs[i]));
         }
       delete_cv_entry (share, id);
       return true;
@@ -284,7 +284,7 @@ Slur_engraver::process_music ()
       Stream_event *ev = start_events_[i].slur_;
       SCM id = ev->get_property ("spanner-id");
       Context *share = get_share_context
-        (ev->get_property ("spanner-share-context"));
+                       (ev->get_property ("spanner-share-context"));
       // Check for existing slur with same id
       if (scm_is_vector (get_cv_entry (share, id)))
         {
@@ -305,7 +305,7 @@ Slur_engraver::process_music ()
       else
         {
           Spanner *slur = create_slur
-            (id, start_events_[i], to_dir (ev->get_property ("direction")));
+                          (id, start_events_[i], to_dir (ev->get_property ("direction")));
           create_cv_entry (share, id, slur, object_name ());
         }
     }
@@ -319,11 +319,11 @@ Slur_engraver::stop_translation_timestep ()
   vector<Grob *> slurs;
   vector<cv_entry> entries = my_cv_entries ();
   for (vsize i = 0; i < entries.size (); i++)
-  {
-    vector<Spanner *> entry_slurs = get_cv_entry_spanners (entries[i].first);
-    for (vsize j = 0; j < entry_slurs.size (); j++)
-      slurs.push_back (entry_slurs[j]);
-  }
+    {
+      vector<Spanner *> entry_slurs = get_cv_entry_spanners (entries[i].first);
+      for (vsize j = 0; j < entry_slurs.size (); j++)
+        slurs.push_back (entry_slurs[j]);
+    }
 
   if (Grob *g = unsmob<Grob> (get_property ("currentCommandColumn")))
     {
