@@ -99,10 +99,9 @@ Translator_group::finalize ()
       if (name == "")
         continue;
       Spanner *span = Spanner_engraver::get_cv_entry_spanner (entry);
-      Stream_event *event = Spanner_engraver::get_cv_entry_event (entry);
       if (span->is_live ())
         {
-          event->origin ()->warning (_f ("unterminated %s", name));
+          span->warning (_f ("unterminated %s", name));
           span->suicide ();
         }
     }

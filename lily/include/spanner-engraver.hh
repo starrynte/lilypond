@@ -1,14 +1,20 @@
+#ifndef SPANNER_ENGRAVER_HH
+#define SPANNER_ENGRAVER_HH
+
 #include "engraver.hh"
 #include "std-string.hh"
 #include "std-vector.hh"
 #include <utility>
 
-// Context property sharedSpanners is an alist:
-// (((engraver-class-name . spanner-id) . entry) etc)
-// entry: (voice spanner event name other)
-// name: e.g. "crescendo"
-// other: extra information formatted as an SCM in C++
-
+// Context property sharedSpanners is an alist: ( (key . entry) etc )
+// key: (engraver-class-name . spanner-id)
+// entry: #(voice spanner-or-list name other)
+//   voice: Voice context that this spanner currently belongs to
+//   name: e.g. "crescendo"
+//   other: extra information formatted as an SCM in C++
+// spanner-or-list: spanner OR (spanner spanner etc)
+//   If spanner-or-list is a list, the spanner-id is associated with multiple
+//   spanners. This is needed for, e.g., double slurs
 typedef pair<SCM, Context *> cv_entry;
 
 class Context;
@@ -21,25 +27,27 @@ protected:
 
   Context *get_share_context (SCM s);
 
-  // Get entry associated with an id
+  // Get the entry associated with an id
   // Here and later: look in share_context's context property
   SCM get_cv_entry (Context *share_context, SCM spanner_id);
 
 public:
-  // Get Spanner pointer from entry
+  // Get Spanner from entry
+  // If spanner-or-list is a list, warn and return the first Spanner
   static Spanner *get_cv_entry_spanner (SCM entry);
-
-  // Get spanner event from entry
-  static Stream_event *get_cv_entry_event (SCM entry);
+  // Get all Spanners in spanner-or-list
+  static vector<Spanner *> get_cv_entry_spanners (SCM entry);
 
   // Get spanner name from entry
   static string get_cv_entry_name (SCM entry);
 
-  // Get/set other information from entry
+  // Get "other" from entry
   static SCM get_cv_entry_other (SCM entry);
 
 protected:
-  void set_cv_entry_other (Context *share_context, SCM spanner_id, SCM entry, SCM other);
+  // Set entry's "other"
+  void set_cv_entry_other (Context *share_context, SCM spanner_id, SCM entry,
+                           SCM other);
 
   // Set entry's context to this voice
   void set_cv_entry_context (Context *share_context, SCM spanner_id, SCM entry);
@@ -48,9 +56,20 @@ protected:
   void delete_cv_entry (Context *share_context, SCM spanner_id);
 
   // Create entry in share_context's sharedSpanners property
-  void create_cv_entry (Context *share_context, SCM spanner_id, Spanner *spanner,
-                        Stream_event *event, string name, SCM other = SCM_EOL);
+  void create_cv_entry (Context *share_context, SCM spanner_id,
+                        Spanner *spanner, string name, SCM other = SCM_EOL);
+  void create_cv_entry (Context *share_context, SCM spanner_id,
+                        vector<Spanner *> spanners, string name,
+                        SCM other = SCM_EOL);
 
 private:
+  inline SCM key (SCM spanner_id)
+  { return scm_cons (ly_symbol2scm (class_name ()), spanner_id); }
+
   void set_cv_entry (Context *share_context, SCM spanner_id, SCM entry);
+
+  void create_cv_entry (Context *share_context, SCM spanner_id,
+                        SCM spanner_or_list, string name, SCM other = SCM_EOL);
 };
+
+#endif // SPANNER_ENGRAVER_HH

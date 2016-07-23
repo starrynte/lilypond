@@ -106,14 +106,16 @@ Dynamic_engraver::listen_break_span (Stream_event *event)
         {
           if (ly_is_equal (start_events_[i]->get_property ("spanner-id"), id))
             {
-              end_new_spanner_ = scm_assoc_set_x (end_new_spanner_, id, SCM_BOOL_T);
+              end_new_spanner_ = scm_assoc_set_x
+                                 (end_new_spanner_, id, SCM_BOOL_T);
               return;
             }
         }
 
-      Context *share = get_share_context (event->get_property ("spanner-share-context"));
+      Context *share = get_share_context
+                       (event->get_property ("spanner-share-context"));
       SCM entry = get_cv_entry (share, id);
-      if (scm_is_pair (entry))
+      if (scm_is_vector (entry))
         {
           set_cv_entry_context (share, id, entry);
           Spanner *span = get_cv_entry_spanner (entry);
@@ -148,9 +150,10 @@ Dynamic_engraver::process_music ()
       Stream_event *ender = enders[i];
 
       SCM ender_id = ender->get_property ("spanner-id");
-      Context *share = get_share_context (ender->get_property ("spanner-share-context"));
+      Context *share = get_share_context
+                       (ender->get_property ("spanner-share-context"));
       SCM entry = get_cv_entry (share, ender_id);
-      if (scm_is_pair (entry))
+      if (scm_is_vector (entry))
         {
           Spanner *spanner = get_cv_entry_spanner (entry);
           finished_spanners_.push_back (spanner);
@@ -201,7 +204,8 @@ Dynamic_engraver::process_music ()
 
       spanner->set_property ("spanner-id", id);
 
-      // if we have a break-dynamic-span event right after the start dynamic, break the new spanner immediately
+      // if we have a break-dynamic-span event right after the start dynamic,
+      // break the new spanner immediately
       if (to_boolean (scm_assoc_ref (end_new_spanner_, id)))
         {
           spanner->set_property ("spanner-broken", SCM_BOOL_T);
@@ -221,9 +225,10 @@ Dynamic_engraver::process_music ()
         }
 
       start_spanners.push_back (spanner);
-      Context *share = get_share_context (ev->get_property ("spanner-share-context"));
+      Context *share = get_share_context
+                       (ev->get_property ("spanner-share-context"));
       // Add spanner to sharedSpanners
-      create_cv_entry (share, id, spanner, ev, get_spanner_type (ev));
+      create_cv_entry (share, id, spanner, get_spanner_type (ev));
     }
 
   if (script_event_)
