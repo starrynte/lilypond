@@ -1,4 +1,4 @@
-\version "2.19.21"
+\version "2.19.46"
 
 \header {
   texidoc = "Hairpins, DynamicTextSpanners and dynamics can be
@@ -19,3 +19,18 @@ causes the alignment spanner to end prematurely.
   \breakDynamicSpan
   f,1\p
 }
+
+<<
+  \relative {
+    c'1\=Staff.1^\<
+    \=Staff.1\breakDynamicSpan
+    f1
+    f,1\=Staff.1\p
+  } \\
+  \relative {
+    f1
+    c'1\=Staff.1_\>
+    \=Staff.1\breakDynamicSpan
+    c,1
+  }
+>>
