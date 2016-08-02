@@ -31,7 +31,7 @@
 */
 class Engraver : public Translator
 {
-  Grob *internal_make_grob (SCM sym, SCM cause,
+  virtual Grob *internal_make_grob (SCM sym, SCM cause,
                             char const *f, int l, char const *fun);
   friend SCM ly_engraver_make_grob (SCM, SCM, SCM);
   friend class Engraver_group;

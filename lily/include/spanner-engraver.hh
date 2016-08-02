@@ -8,8 +8,8 @@
 
 // Context property sharedSpanners is an alist: ( (key . entry) etc )
 // key: (engraver-class-name . spanner-id)
-// entry: #(voice spanner-or-list name other)
-//   voice: Voice context that this spanner currently belongs to
+// entry: #(engraver spanner-or-list name other)
+//   engraver: engraver/voice that this spanner currently belongs to
 //   name: e.g. "crescendo"
 //   other: extra information formatted as an SCM in C++
 // spanner-or-list: spanner OR (spanner spanner etc)
@@ -21,6 +21,33 @@ class Context;
 class Stream_event;
 class Spanner_engraver : public Engraver
 {
+protected:
+  struct Event_info
+  {
+    Stream_event *ev_;
+    // Additional information
+    SCM info_;
+  }
+  vector<Event_info> start_events_;
+  vector<Event_info> stop_events_;
+
+  vector<Spanner *> current_spanners_;
+  vector<Spanner *> finished_spanners_;
+
+  #define CURRENT_SPANNERS (s)                    \
+    int i = 0, Spanner *s = current_spanners_[0]; \
+    s != NULL;                                    \
+    i++, s = (i < current_spanners_.size () ? current_spanners_[i] : NULL)
+
+  #define FINISHED_SPANNERS (s)                    \
+    int i = 0, Spanner *s = finished_spanners_[0]; \
+    s != NULL;                                     \
+    i++, s = (i < finished_spanners_.size () ? finished_spanners_[i] : NULL)
+
+  virtual void derived_mark () const;
+
+
+
 protected:
   // Get spanner entries currently belonging to this voice
   vector<cv_entry> my_cv_entries ();

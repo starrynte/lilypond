@@ -4,6 +4,102 @@
 #include "std-string.hh"
 #include "std-vector.hh"
 
+void
+Spanner_engraver::derived_mark ()
+{
+  for (vsize i = start_events_.size (); i--;)
+    {
+      scm_gc_mark (start_events_[i].ev_->self_scm ());
+      if (!scm_is_null (start_events_[i].info_))
+        scm_gc_mark (start_events_[i].info_);
+    }
+  for (vsize i = stop_events_.size (); i--;)
+    {
+      scm_gc_mark (stop_events_[i].ev_->self_scm ());
+      if (!scm_is_null (stop_events_[i].info_))
+        scm_gc_mark (stop_events_[i].info_);
+    }
+}
+
+void
+Spanner_engraver::listen_spanner_event_once (Stream_event *ev, SCM info,
+                                             bool warn_duplicate)
+{
+  Direction start_stop = to_dir (ev->get_property ("span-direction"));
+  vector<Event_info> &events;
+  if (start_stop == STOP)
+    {
+      events = stop_events_;
+    }
+  else
+    {
+      if (start_stop != START)
+        ev->origin ()->warning (_f ("direction of %s invalid: %d",
+                                    ev->name ().c_str (),
+                                    int (start_stop)));
+      events = start_events_;
+    }
+
+  SCM id = ev->get_property ("spanner-id");
+
+  // Check for existing event with same id
+  for (vsize i = 0; i < events.size (); i++)
+    {
+      Stream_event *existing = events[i].ev;
+      if (ly_is_equal (id, existing->get_property ("spanner-id")))
+        {
+          // If existing has no direction but ev does, replace existing with ev
+          if (!to_dir (existing->get_property ("direction"))
+              && to_dir (ev->get_property ("direction")))
+            events[i] = Event_info (ev, info);
+
+          if (warn_duplicate)
+            {
+              ev->origin ()->warning ("Two simultaneous events, skipping this one");
+              existing->origin ()->warning ("Previous event here");
+            }
+          return;
+        }
+    }
+
+  events.push_back (Event_info (ev, info));
+}
+
+void
+Spanner_engraver::process_stop_events (void (*callback)(Stream_event *, SCM, Spanner *))
+{
+  for (vsize i = 0; i < stop_events_.size (); i++)
+    {
+      Stream_event *ev = stop_events_[i].ev;
+      SCM info = stop_events_[i].info;
+      SCM id = ev->get_property ("spanner-id");
+      Context *share
+        = get_share_context (ev->get_property ("spanner-share-context"));
+      ...
+      callback (ev, info, ...);
+    }
+}
+
+void
+Spanner_engraver::process_start_events (void (*callback)(Stream_event *, SCM))
+{
+  for (vsize i = 0; i < start_events_.size (); i++)
+    callback (start_events_[i].ev, start_events_[i].info);
+}
+
+// Override
+Spanner *
+Spanner_engraver::internal_make_spanner (SCM x, SCM cause,
+                                         char const *file, int line, char const *fun)
+{
+  Spanner *span = Engraver::internal_make_spanner (x, cause, file, line, fun);
+  ...
+  return span;
+}
+
+// announce_end_grob
+
+
 vector<cv_entry>
 Spanner_engraver::my_cv_entries ()
 {
