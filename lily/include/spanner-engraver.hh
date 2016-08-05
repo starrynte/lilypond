@@ -6,16 +6,15 @@
 #include "std-vector.hh"
 #include <utility>
 
-// Context property sharedSpanners is an alist: ( (key . entry) etc )
-// key: (engraver-class-name . spanner-id)
-// entry: #(engraver spanner-or-list name other)
-//   engraver: engraver/voice that this spanner currently belongs to
-//   name: e.g. "crescendo"
-//   other: extra information formatted as an SCM in C++
-// spanner-or-list: spanner OR (spanner spanner etc)
-//   If spanner-or-list is a list, the spanner-id is associated with multiple
-//   spanners. This is needed for, e.g., double slurs
-typedef pair<SCM, Context *> cv_entry;
+// Context property sharedSpanners is an alist:
+// (engraver-class-name . spanner-id) -> spanner-list
+// spanner-list: (spanner spanner etc)
+//   If spanner-list has multiple elements, the spanner-id is associated with
+//   multiple spanners. This is needed for, e.g., double slurs
+
+// Any spanners in the context property may cross voices within that context.
+// The current voice a spanner belongs to is stored in the spanner property
+// current-engraver.
 
 class Context;
 class Stream_event;
@@ -27,76 +26,60 @@ protected:
     Stream_event *ev_;
     // Additional information
     SCM info_;
-  }
+  };
   vector<Event_info> start_events_;
   vector<Event_info> stop_events_;
 
   vector<Spanner *> current_spanners_;
   vector<Spanner *> finished_spanners_;
 
-  #define CURRENT_SPANNERS (s)                    \
-    int i = 0, Spanner *s = current_spanners_[0]; \
-    s != NULL;                                    \
-    i++, s = (i < current_spanners_.size () ? current_spanners_[i] : NULL)
+  #define CURRENT_SPANNERS (s)                               \
+    vector<Spanner *>::iterator s = current_spanners_.begin (); \
+    s != current_spanners_.end (); s++
 
-  #define FINISHED_SPANNERS (s)                    \
-    int i = 0, Spanner *s = finished_spanners_[0]; \
-    s != NULL;                                     \
-    i++, s = (i < finished_spanners_.size () ? finished_spanners_[i] : NULL)
+  #define FINISHED_SPANNERS (s)                               \
+    vector<Spanner *>::iterator s = finished_spanners_.begin (); \
+    s != finished_spanners_.end (); s++
+
+  #define LISTEN_SPANNER_EVENT_ONCE (...)
+  void listen_spanner_event_once (Stream_event *ev, SCM info, bool warn_duplicate);
+
+  void process_stop_events ();
+  void process_start_events ();
+
+  #define make_multi_spanner (x, cause, event)                    \
+    internal_make_multi_spanner (ly_symbol2scm (x), cause, event  \
+                                 __FILE__, __LINE__, __FUNCTION__)
+  Spanner *internal_make_multi_spanner (SCM x, SCM cause, Stream_event *event,
+                                        string name, char const *file,
+                                        int line, char const *fun);
+
+  void end_spanner (Spanner *span, SCM cause, Stream_event *event, bool announce = true);
+
+  virtual void stop_translation_timestep ();
 
   virtual void derived_mark () const;
 
 
 
 protected:
-  // Get spanner entries currently belonging to this voice
-  vector<cv_entry> my_cv_entries ();
-
   Context *get_share_context (SCM s);
 
-  // Get the entry associated with an id
-  // Here and later: look in share_context's context property
-  SCM get_cv_entry (Context *share_context, SCM spanner_id);
+  // Get the spanner(s) in a context with an id
+  // If spanner-list has more than one spanner, the first function warns
+  // and returns the first spanner
+  static Spanner *get_shared_spanner (Context *share, SCM spanner_id);
+  static vector<Spanner *> get_shared_spanners (Context *share, SCM spanner_id);
 
-public:
-  // Get Spanner from entry
-  // If spanner-or-list is a list, warn and return the first Spanner
-  static Spanner *get_cv_entry_spanner (SCM entry);
-  // Get all Spanners in spanner-or-list
-  static vector<Spanner *> get_cv_entry_spanners (SCM entry);
+  // Delete spanner(s) from share's sharedSpanners property
+  static void delete_shared_spanner (Context *share, SCM spanner_id);
 
-  // Get spanner name from entry
-  static string get_cv_entry_name (SCM entry);
-
-  // Get "other" from entry
-  static SCM get_cv_entry_other (SCM entry);
-
-protected:
-  // Set entry's "other"
-  void set_cv_entry_other (Context *share_context, SCM spanner_id, SCM entry,
-                           SCM other);
-
-  // Set entry's context to this voice
-  void set_cv_entry_context (Context *share_context, SCM spanner_id, SCM entry);
-
-  // Delete entry from share_context's sharedSpanners property
-  void delete_cv_entry (Context *share_context, SCM spanner_id);
-
-  // Create entry in share_context's sharedSpanners property
-  void create_cv_entry (Context *share_context, SCM spanner_id,
-                        Spanner *spanner, string name, SCM other = SCM_EOL);
-  void create_cv_entry (Context *share_context, SCM spanner_id,
-                        vector<Spanner *> spanners, string name,
-                        SCM other = SCM_EOL);
+  // Add spanner to share's sharedSpanners property
+  static void add_shared_spanner (Context *share, SCM spanner_id, Spanner *span);
 
 private:
   inline SCM key (SCM spanner_id)
   { return scm_cons (ly_symbol2scm (class_name ()), spanner_id); }
-
-  void set_cv_entry (Context *share_context, SCM spanner_id, SCM entry);
-
-  void create_cv_entry (Context *share_context, SCM spanner_id,
-                        SCM spanner_or_list, string name, SCM other = SCM_EOL);
 };
 
 #endif // SPANNER_ENGRAVER_HH

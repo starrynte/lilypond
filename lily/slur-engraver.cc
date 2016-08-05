@@ -159,7 +159,7 @@ Slur_engraver::acknowledge_script (Grob_info info)
 void
 Slur_engraver::stop_event_callback (Stream_event *ev, SCM note, Spanner *slur)
 {
-  announce_end_grob (slur, SCM_EOL);
+  end_spanner (slur, ev->self_scm (), ev);
   if (!scm_is_null (note))
     note_slurs_[STOP].insert
     (Note_slurs::value_type (unsmob<Stream_event> (note), slur));
@@ -168,7 +168,7 @@ Slur_engraver::stop_event_callback (Stream_event *ev, SCM note, Spanner *slur)
 void
 Slur_engraver::create_slur (Stream_event *ev, SCM note, Direction d)
 {
-  Spanner *slur = make_spanner (grob_symbol (), ev->self_scm ());
+  Spanner *slur = make_multi_spanner (grob_symbol (), ev->self_scm (), ev, object_name ());
   if (d)
     set_grob_direction (slur, d);
   if (!scm_is_null (note))
@@ -227,5 +227,6 @@ Slur_engraver::stop_translation_timestep ()
   note_slurs_[LEFT].clear ();
   note_slurs_[RIGHT].clear ();
   objects_to_acknowledge_.clear ();
-  Spanner_engraver::stop_translation_timestep ();
+  // TODO investigate pseudo virtual methods
+//  Spanner_engraver::stop_translation_timestep ();
 }
