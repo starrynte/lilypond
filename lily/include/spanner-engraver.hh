@@ -33,32 +33,28 @@ protected:
   vector<Spanner *> current_spanners_;
   vector<Spanner *> finished_spanners_;
 
-  #define CURRENT_SPANNERS (s)                               \
-    vector<Spanner *>::iterator s = current_spanners_.begin (); \
-    s != current_spanners_.end (); s++
+//  #define LISTEN_SPANNER_EVENT_ONCE(...)
+  void listen_spanner_event_once (Stream_event *ev, SCM info, bool warn_duplicate = true);
 
-  #define FINISHED_SPANNERS (s)                               \
-    vector<Spanner *>::iterator s = finished_spanners_.begin (); \
-    s != finished_spanners_.end (); s++
+  void process_stop_events (void (*callback) (Stream_event *ev, SCM info, Spanner *span));
+  void process_start_events (void (*callback) (Stream_event *ev, SCM info));
 
-  #define LISTEN_SPANNER_EVENT_ONCE (...)
-  void listen_spanner_event_once (Stream_event *ev, SCM info, bool warn_duplicate);
-
-  void process_stop_events ();
-  void process_start_events ();
-
-  #define make_multi_spanner (x, cause, event)                    \
+  #define make_multi_spanner(x, cause, event)                    \
     internal_make_multi_spanner (ly_symbol2scm (x), cause, event  \
                                  __FILE__, __LINE__, __FUNCTION__)
   Spanner *internal_make_multi_spanner (SCM x, SCM cause, Stream_event *event,
-                                        string name, char const *file,
-                                        int line, char const *fun);
+                                        char const *file, int line, char const *fun);
 
   void end_spanner (Spanner *span, SCM cause, Stream_event *event, bool announce = true);
 
-  virtual void stop_translation_timestep ();
-
   virtual void derived_mark () const;
+
+  inline void stop_timestep_clear ()
+  {
+    start_events_.clear ();
+    stop_events_.clear ();
+    finished_spanners_.clear ();
+  }
 
 
 

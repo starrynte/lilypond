@@ -59,11 +59,12 @@ protected:
   void listen_slur (Stream_event *ev) { listen_note_slur (ev, 0); }
   void acknowledge_extra_object (Grob_info);
   void stop_translation_timestep ();
+
+  void stop_event_callback (Stream_event *ev, SCM note, Spanner *slur);
+  void start_event_callback (Stream_event *ev, SCM note);
+  void create_slur (Stream_event *ev, SCM note, Direction dir);
   void process_music ();
 
-  bool can_start_slur (SCM, Stream_event *);
-  Spanner *create_slur (SCM spanner_id, Event_info evi, Direction dir);
-  bool try_to_end (Event_info evi);
 
   virtual void set_melisma (bool);
   virtual void derived_mark () const;

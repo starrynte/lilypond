@@ -17,7 +17,6 @@
   along with LilyPond.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "context.hh"
 #include "engraver.hh"
 #include "hairpin.hh"
 #include "international.hh"
@@ -26,14 +25,12 @@
 #include "pointer-group-interface.hh"
 #include "self-alignment-interface.hh"
 #include "spanner.hh"
-#include "spanner-engraver.hh"
-#include "std-vector.hh"
 #include "stream-event.hh"
 #include "text-interface.hh"
 
 #include "translator.icc"
 
-class Dynamic_engraver : public Spanner_engraver
+class Dynamic_engraver : public Engraver
 {
   TRANSLATOR_DECLARATIONS (Dynamic_engraver);
   void acknowledge_note_column (Grob_info);
@@ -44,27 +41,32 @@ class Dynamic_engraver : public Spanner_engraver
 protected:
   virtual void process_music ();
   virtual void stop_translation_timestep ();
+  virtual void finalize ();
 
 private:
   SCM get_property_setting (Stream_event *evt, char const *evprop,
                             char const *ctxprop);
   string get_spanner_type (Stream_event *ev);
 
-  vector<Stream_event *> start_events_;
-  vector<Stream_event *> stop_events_;
-  vector<Spanner *> finished_spanners_;
+  Drul_array<Stream_event *> accepted_spanevents_drul_;
+  Spanner *current_spanner_;
+  Spanner *finished_spanner_;
 
   Item *script_;
   Stream_event *script_event_;
-  // alist: (spanner-id . boolean)
-  SCM end_new_spanner_;
+  Stream_event *current_span_event_;
+  bool end_new_spanner_;
 };
 
 Dynamic_engraver::Dynamic_engraver ()
 {
   script_event_ = 0;
+  current_span_event_ = 0;
   script_ = 0;
-  end_new_spanner_ = SCM_EOL;
+  finished_spanner_ = 0;
+  current_spanner_ = 0;
+  accepted_spanevents_drul_.set (0, 0);
+  end_new_spanner_ = false;
 }
 
 void
@@ -77,18 +79,8 @@ void
 Dynamic_engraver::listen_span_dynamic (Stream_event *ev)
 {
   Direction d = to_dir (ev->get_property ("span-direction"));
-  SCM id = ev->get_property ("spanner-id");
 
-  vector<Stream_event *> &events = (d == STOP) ? stop_events_ : start_events_;
-  for (vsize i = 0; i < events.size (); i++)
-    {
-      if (ly_is_equal (events[i]->get_property ("spanner-id"), id))
-        {
-          ev->origin ()->warning ("Ignoring duplicate span dynamic event");
-          return;
-        }
-    }
-  events.push_back (ev);
+  ASSIGN_EVENT_ONCE (accepted_spanevents_drul_[d], ev);
 }
 
 void
@@ -99,28 +91,10 @@ Dynamic_engraver::listen_break_span (Stream_event *event)
       // Case 1: Already have a start dynamic event -> break applies to new
       //         spanner (created later) -> set a flag
       // Case 2: no new spanner, but spanner already active -> break it now
-      // Only break cross voice spanners if event has matching id
-
-      SCM id = event->get_property ("spanner-id");
-      for (vsize i = 0; i < start_events_.size (); i++)
-        {
-          if (ly_is_equal (start_events_[i]->get_property ("spanner-id"), id))
-            {
-              end_new_spanner_ = scm_assoc_set_x
-                                 (end_new_spanner_, id, SCM_BOOL_T);
-              return;
-            }
-        }
-
-      Context *share = get_share_context
-                       (event->get_property ("spanner-share-context"));
-      SCM entry = get_cv_entry (share, id);
-      if (scm_is_vector (entry))
-        {
-          set_cv_entry_context (share, id, entry);
-          Spanner *span = get_cv_entry_spanner (entry);
-          span->set_property ("spanner-broken", SCM_BOOL_T);
-        }
+      if (accepted_spanevents_drul_[START])
+        end_new_spanner_ = true;
+      else if (current_spanner_)
+        current_spanner_->set_property ("spanner-broken", SCM_BOOL_T);
     }
 }
 
@@ -138,97 +112,79 @@ Dynamic_engraver::get_property_setting (Stream_event *evt,
 void
 Dynamic_engraver::process_music ()
 {
-  // Check for ended spanners
-  // All events that end: stop events, start events, script event
-  vector<Stream_event *> enders = stop_events_;
-  enders.insert (enders.end (), start_events_.begin (), start_events_.end ());
-  if (script_event_)
-    enders.push_back (script_event_);
-
-  for (vsize i = 0; i < enders.size (); i++)
+  if (current_spanner_
+      && (accepted_spanevents_drul_[STOP]
+          || script_event_
+          || accepted_spanevents_drul_[START]))
     {
-      Stream_event *ender = enders[i];
+      Stream_event *ender = accepted_spanevents_drul_[STOP];
+      if (!ender)
+        ender = script_event_;
 
-      SCM ender_id = ender->get_property ("spanner-id");
-      Context *share = get_share_context
-                       (ender->get_property ("spanner-share-context"));
-      SCM entry = get_cv_entry (share, ender_id);
-      if (scm_is_vector (entry))
-        {
-          Spanner *spanner = get_cv_entry_spanner (entry);
-          finished_spanners_.push_back (spanner);
-          announce_end_grob (spanner, ender->self_scm ());
-          delete_cv_entry (share, ender_id);
-        }
+      if (!ender)
+        ender = accepted_spanevents_drul_[START];
+
+      finished_spanner_ = current_spanner_;
+      announce_end_grob (finished_spanner_, ender->self_scm ());
+      current_spanner_ = 0;
+      current_span_event_ = 0;
     }
 
-  // Create new spanners
-  vector<Spanner *> start_spanners;
-  for (vsize i = 0; i < start_events_.size (); i++)
+  if (accepted_spanevents_drul_[START])
     {
-      Stream_event *ev = start_events_[i];
-      SCM id = ev->get_property ("spanner-id");
-      Spanner *spanner;
+      current_span_event_ = accepted_spanevents_drul_[START];
 
-      string start_type = get_spanner_type (ev);
-      SCM cresc_type = get_property_setting (ev, "span-type",
+      string start_type = get_spanner_type (current_span_event_);
+      SCM cresc_type = get_property_setting (current_span_event_, "span-type",
                                              (start_type + "Spanner").c_str ());
 
       if (scm_is_eq (cresc_type, ly_symbol2scm ("text")))
         {
-          spanner = make_spanner ("DynamicTextSpanner", ev->self_scm ());
+          current_spanner_
+            = make_spanner ("DynamicTextSpanner",
+                            accepted_spanevents_drul_[START]->self_scm ());
 
-          SCM text = get_property_setting (ev, "span-text",
+          SCM text = get_property_setting (current_span_event_, "span-text",
                                            (start_type + "Text").c_str ());
           if (Text_interface::is_markup (text))
-            spanner->set_property ("text", text);
+            current_spanner_->set_property ("text", text);
           /*
             If the line of a text spanner is hidden, end the alignment spanner
             early: this allows dynamics to be spaced individually instead of
             being linked together.
           */
-          if (scm_is_eq (spanner->get_property ("style"),
+          if (scm_is_eq (current_spanner_->get_property ("style"),
                          ly_symbol2scm ("none")))
-            spanner->set_property ("spanner-broken", SCM_BOOL_T);
+            current_spanner_->set_property ("spanner-broken", SCM_BOOL_T);
         }
       else
         {
           if (!scm_is_eq (cresc_type, ly_symbol2scm ("hairpin")))
             {
               string as_string = ly_scm_write_string (cresc_type);
-              ev
+              current_span_event_
               ->origin ()->warning (_f ("unknown crescendo style: %s\ndefaulting to hairpin.", as_string.c_str ()));
             }
-          spanner = make_spanner ("Hairpin", ev->self_scm ());
+          current_spanner_ = make_spanner ("Hairpin",
+                                           current_span_event_->self_scm ());
         }
-
-      spanner->set_property ("spanner-id", id);
-
-      // if we have a break-dynamic-span event right after the start dynamic,
-      // break the new spanner immediately
-      if (to_boolean (scm_assoc_ref (end_new_spanner_, id)))
+      // if we have a break-dynamic-span event right after the start dynamic, break the new spanner immediately
+      if (end_new_spanner_)
         {
-          spanner->set_property ("spanner-broken", SCM_BOOL_T);
-          end_new_spanner_ = scm_assoc_remove_x (end_new_spanner_, id);
+          current_spanner_->set_property ("spanner-broken", SCM_BOOL_T);
+          end_new_spanner_ = false;
         }
-      for (size_t j = 0; j < finished_spanners_.size (); j++)
+      if (finished_spanner_)
         {
-          Spanner *finished = finished_spanners_[j];
-          if (has_interface<Hairpin> (finished))
-            Pointer_group_interface::add_grob (finished,
+          if (has_interface<Hairpin> (finished_spanner_))
+            Pointer_group_interface::add_grob (finished_spanner_,
                                                ly_symbol2scm ("adjacent-spanners"),
-                                               spanner);
-          if (has_interface<Hairpin> (spanner))
-            Pointer_group_interface::add_grob (spanner,
+                                               current_spanner_);
+          if (has_interface<Hairpin> (current_spanner_))
+            Pointer_group_interface::add_grob (current_spanner_,
                                                ly_symbol2scm ("adjacent-spanners"),
-                                               finished);
+                                               finished_spanner_);
         }
-
-      start_spanners.push_back (spanner);
-      Context *share = get_share_context
-                       (ev->get_property ("spanner-share-context"));
-      // Add spanner to sharedSpanners
-      create_cv_entry (share, id, spanner, get_spanner_type (ev));
     }
 
   if (script_event_)
@@ -237,40 +193,47 @@ Dynamic_engraver::process_music ()
       script_->set_property ("text",
                              script_event_->get_property ("text"));
 
-      for (vsize i = 0; i < finished_spanners_.size (); i++)
-        finished_spanners_[i]->set_bound (RIGHT, script_);
-      for (vsize i = 0; i < start_spanners.size (); i++)
-        start_spanners[i]->set_bound (LEFT, script_);
+      if (finished_spanner_)
+        finished_spanner_->set_bound (RIGHT, script_);
+      if (current_spanner_)
+        current_spanner_->set_bound (LEFT, script_);
     }
 }
 
 void
 Dynamic_engraver::stop_translation_timestep ()
 {
-  for (vsize i = 0; i < finished_spanners_.size (); i++)
-    {
-      if (!finished_spanners_[i]->get_bound (RIGHT))
-        finished_spanners_[i]
-        ->set_bound (RIGHT,
-                     unsmob<Grob> (get_property ("currentMusicalColumn")));
-    }
+  if (finished_spanner_ && !finished_spanner_->get_bound (RIGHT))
+    finished_spanner_
+    ->set_bound (RIGHT,
+                 unsmob<Grob> (get_property ("currentMusicalColumn")));
 
-  vector<cv_entry> entries = my_cv_entries ();
-  for (vsize i = 0; i < entries.size (); i++)
-    {
-      Spanner *span = get_cv_entry_spanner (entries[i].first);
-      if (!span->get_bound (LEFT))
-        span
-        ->set_bound (LEFT,
-                     unsmob<Grob> (get_property ("currentMusicalColumn")));
-    }
-
+  if (current_spanner_ && !current_spanner_->get_bound (LEFT))
+    current_spanner_
+    ->set_bound (LEFT,
+                 unsmob<Grob> (get_property ("currentMusicalColumn")));
   script_ = 0;
   script_event_ = 0;
-  start_events_.clear ();
-  stop_events_.clear ();
-  finished_spanners_.clear ();
-  end_new_spanner_ = SCM_EOL;
+  accepted_spanevents_drul_.set (0, 0);
+  finished_spanner_ = 0;
+  end_new_spanner_ = false;
+}
+
+void
+Dynamic_engraver::finalize ()
+{
+  if (current_spanner_
+      && !current_spanner_->is_live ())
+    current_spanner_ = 0;
+  if (current_spanner_)
+    {
+      current_span_event_
+      ->origin ()->warning (_f ("unterminated %s",
+                                get_spanner_type (current_span_event_)
+                                .c_str ()));
+      current_spanner_->suicide ();
+      current_spanner_ = 0;
+    }
 }
 
 string
@@ -306,18 +269,10 @@ Dynamic_engraver::acknowledge_note_column (Grob_info info)
         script_->set_parent (x_parent, X_AXIS);
     }
 
-  vector<cv_entry> entries = my_cv_entries ();
-  for (vsize i = 0; i < entries.size (); i++)
-    {
-      Spanner *span = get_cv_entry_spanner (entries[i].first);
-      if (!span->get_bound (LEFT))
-        span->set_bound (LEFT, info.grob ());
-    }
-  for (vsize i = 0; i < finished_spanners_.size (); i++)
-    {
-      if (!finished_spanners_[i]->get_bound (RIGHT))
-        finished_spanners_[i]->set_bound (RIGHT, info.grob ());
-    }
+  if (current_spanner_ && !current_spanner_->get_bound (LEFT))
+    current_spanner_->set_bound (LEFT, info.grob ());
+  if (finished_spanner_ && !finished_spanner_->get_bound (RIGHT))
+    finished_spanner_->set_bound (RIGHT, info.grob ());
 }
 
 void

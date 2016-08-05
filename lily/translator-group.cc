@@ -93,16 +93,16 @@ Translator_group::finalize ()
 
   for (; scm_is_pair (s); s = scm_cdr (s))
     {
-      SCM entry = scm_cdar (s);
-      string name = Spanner_engraver::get_cv_entry_name (entry);
-      // Don't warn for spanners with no names
-      if (name == "")
-        continue;
-      Spanner *span = Spanner_engraver::get_cv_entry_spanner (entry);
-      if (span->is_live ())
+      SCM spanner_list = scm_cdar (s);
+      while (scm_is_pair (spanner_list))
         {
-          span->warning (_f ("unterminated %s", name));
-          span->suicide ();
+          Spanner *span = unsmob<Spanner> (scm_car (spanner_list));
+          if (span->is_live ())
+            {
+              span->warning (_f ("unterminated %s", span->name ()));
+              span->suicide ();
+            }
+          spanner_list = scm_cdr (spanner_list);
         }
     }
   context_->unset_property (ly_symbol2scm ("sharedSpanners"));
