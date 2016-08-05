@@ -22,31 +22,20 @@
 #define SLUR_ENGRAVER_HH
 
 #include "engraver.hh"
+#include "spanner-engraver.hh"
 #include <map>
 
-class Slur_engraver : public Engraver
+class Slur_engraver : public Spanner_engraver
 {
 protected:
-  struct Event_info {
-    Stream_event *slur_, *note_;
-    Event_info (Stream_event *slur, Stream_event *note)
-      : slur_ (slur), note_ (note)
-    { }
-  };
-  // protected so that subclasses can see them
-  vector<Event_info> start_events_;
-  vector<Event_info> stop_events_;
-
   typedef std::multimap<Stream_event *, Spanner *> Note_slurs;
   Drul_array<Note_slurs> note_slurs_;
-  vector<Grob *> slurs_;
-  vector<Grob *> end_slurs_;
   vector<Grob_info> objects_to_acknowledge_;
 
   virtual SCM event_symbol () const;
   virtual bool double_property () const;
   virtual SCM grob_symbol () const;
-  virtual const char* object_name () const;
+  virtual const char *object_name () const;
 
   void acknowledge_note_column (Grob_info);
   void acknowledge_script (Grob_info);
@@ -58,15 +47,13 @@ protected:
   void listen_slur (Stream_event *ev) { listen_note_slur (ev, 0); }
   void acknowledge_extra_object (Grob_info);
   void stop_translation_timestep ();
+
+  virtual void stop_event_callback (Stream_event *ev, SCM note, Spanner *slur);
+  virtual void start_event_callback (Stream_event *ev, SCM note);
+  void create_slur (Stream_event *ev, SCM note, Direction dir);
   void process_music ();
 
-  bool can_create_slur (SCM, vsize, vsize *, Stream_event *);
-  void create_slur (SCM spanner_id, Event_info evi, Grob *g_cause, Direction dir, bool left_broken);
-  bool try_to_end (Event_info evi);
-
   virtual void set_melisma (bool);
-  virtual void finalize ();
-  virtual void derived_mark () const;
 
 public:
   TRANSLATOR_DECLARATIONS (Slur_engraver);

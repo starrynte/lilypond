@@ -236,16 +236,18 @@ Slur::get_curve (Grob *me)
 }
 
 void
-Slur::add_column (Grob *me, Grob *n)
+Slur::add_column (Spanner *me, Grob *n)
 {
-  Pointer_group_interface::add_grob (me, ly_symbol2scm ("note-columns"), n);
-  add_bound_item (dynamic_cast<Spanner *> (me), n);
+  Pointer_group_interface::add_grob (static_cast<Spanner *> (me),
+                                     ly_symbol2scm ("note-columns"), n);
+  add_bound_item (me, n);
 }
 
 void
-Slur::add_extra_encompass (Grob *me, Grob *n)
+Slur::add_extra_encompass (Spanner *me, Grob *n)
 {
-  Pointer_group_interface::add_grob (me, ly_symbol2scm ("encompass-objects"), n);
+  Pointer_group_interface::add_grob (static_cast<Grob *> (me),
+                                     ly_symbol2scm ("encompass-objects"), n);
 }
 
 MAKE_SCHEME_CALLBACK_WITH_OPTARGS (Slur, pure_outside_slur_callback, 4, 1, "");
@@ -390,15 +392,15 @@ Slur::vertical_skylines (SCM smob)
  */
 void
 Slur::auxiliary_acknowledge_extra_object (Grob_info const &info,
-                                          vector<Grob *> &slurs,
-                                          vector<Grob *> &end_slurs)
+                                          vector<Spanner *> &slurs,
+                                          vector<Spanner *> &end_slurs)
 {
   if (slurs.empty () && end_slurs.empty ())
     return;
 
   Grob *e = info.grob ();
   SCM avoid = e->get_property ("avoid-slur");
-  Grob *slur;
+  Spanner *slur;
   if (end_slurs.size () && !slurs.size ())
     slur = end_slurs[0];
   else
