@@ -1,12 +1,13 @@
 #include <algorithm>
 #include "context.hh"
+#include "international.hh"
 #include "spanner.hh"
 #include "spanner-engraver.hh"
 #include "std-string.hh"
 #include "std-vector.hh"
 
 void
-Spanner_engraver::derived_mark ()
+Spanner_engraver::derived_mark () const
 {
   for (vsize i = start_events_.size (); i--;)
     {
@@ -27,26 +28,18 @@ Spanner_engraver::listen_spanner_event_once (Stream_event *ev, SCM info,
                                              bool warn_duplicate)
 {
   Direction start_stop = to_dir (ev->get_property ("span-direction"));
-  vector<Event_info> &events;
-  if (start_stop == STOP)
-    {
-      events = stop_events_;
-    }
-  else
-    {
-      if (start_stop != START)
-        ev->origin ()->warning (_f ("direction of %s invalid: %d",
-                                    ev->name ().c_str (),
-                                    int (start_stop)));
-      events = start_events_;
-    }
+  vector<Event_info> &events = (start_stop == STOP) ? stop_events_ : start_events_;
+  if (start_stop != START && start_stop != STOP)
+    ev->origin ()->warning (_f ("direction of %s invalid: %d",
+                                ev->name ().c_str (),
+                                int (start_stop)));
 
   SCM id = ev->get_property ("spanner-id");
 
   // Check for existing event with same id
   for (vsize i = 0; i < events.size (); i++)
     {
-      Stream_event *existing = events[i].ev;
+      Stream_event *existing = events[i].ev_;
       if (ly_is_equal (id, existing->get_property ("spanner-id")))
         {
           // If existing has no direction but ev does, replace existing with ev
@@ -67,12 +60,12 @@ Spanner_engraver::listen_spanner_event_once (Stream_event *ev, SCM info,
 }
 
 void
-Spanner_engraver::process_stop_events (void (*callback)(Stream_event *, SCM, Spanner *))
+Spanner_engraver::process_stop_events ()
 {
   for (vsize i = 0; i < stop_events_.size (); i++)
     {
-      Stream_event *ev = stop_events_[i].ev;
-      SCM info = stop_events_[i].info;
+      Stream_event *ev = stop_events_[i].ev_;
+      SCM info = stop_events_[i].info_;
 
       SCM id = ev->get_property ("spanner-id");
       Context *share
@@ -80,15 +73,25 @@ Spanner_engraver::process_stop_events (void (*callback)(Stream_event *, SCM, Spa
       vector<Spanner *> spanners = get_shared_spanners (share, id);
 
       for (vsize j = 0; j < spanners.size (); j++)
-        callback (ev, info, spanners[j]);
+        stop_event_callback (ev, info, spanners[j]);
     }
 }
 
 void
-Spanner_engraver::process_start_events (void (*callback)(Stream_event *, SCM))
+Spanner_engraver::process_start_events ()
 {
   for (vsize i = 0; i < start_events_.size (); i++)
-    callback (start_events_[i].ev, start_events_[i].info);
+    start_event_callback (start_events_[i].ev_, start_events_[i].info_);
+}
+
+void
+Spanner_engraver::stop_event_callback (Stream_event *ev, SCM info, Spanner *span)
+{
+}
+
+void
+Spanner_engraver::start_event_callback (Stream_event *ev, SCM info)
+{
 }
 
 Spanner *
@@ -103,7 +106,7 @@ Spanner_engraver::internal_make_multi_spanner (SCM x, SCM cause, Stream_event *e
   current_spanners_.push_back (span);
 
   Context *share = get_share_context (event->get_property ("spanner-share-context"));
-  create_shared_spanner (share, id, span);
+  add_shared_spanner (share, id, span);
 
   return span;
 }
@@ -121,7 +124,7 @@ Spanner_engraver::end_spanner (Spanner *span, SCM cause,
   for (vsize i = 0; i < current.size (); i++)
     if (to_boolean (scm_equal_p (current[i]->self_scm (), span_scm)))
       {
-        current.erase (i);
+        current.erase (current.begin () + i);
         break;
       }
 
@@ -132,6 +135,14 @@ Spanner_engraver::end_spanner (Spanner *span, SCM cause,
   Context *share = get_share_context (event->get_property ("spanner-share-context"));
   // TODO may be called multiple times: need to check?
   delete_shared_spanner (share, id);
+}
+
+void
+Spanner_engraver::stop_timestep_clear ()
+{
+  start_events_.clear ();
+  stop_events_.clear ();
+  finished_spanners_.clear ();
 }
 
 
@@ -145,8 +156,11 @@ Spanner_engraver::get_share_context (SCM s)
 Spanner *
 Spanner_engraver::get_shared_spanner (Context *share, SCM spanner_id)
 {
-  SCM spanner_list = scm_assoc_ref (share->get_property ("sharedSpanners"),
-                                    key (spanner_id));
+  SCM shared_spanners;
+  if (!share->here_defined (ly_symbol2scm ("sharedSpanners"), &shared_spanners))
+    return NULL;
+
+  SCM spanner_list = scm_assoc_ref (shared_spanners, key (spanner_id));
   if (scm_is_false (spanner_list) || !scm_is_pair (spanner_list))
     return NULL;
 
@@ -159,14 +173,16 @@ Spanner_engraver::get_shared_spanner (Context *share, SCM spanner_id)
 vector<Spanner *>
 Spanner_engraver::get_shared_spanners (Context *share, SCM spanner_id)
 {
-  SCM spanner_list = scm_assoc_ref (share->get_property ("sharedSpanners"),
-                                    key (spanner_id));
-
   vector<Spanner *> spanners;
-  while (scm_is_pair (spanner_list))
+  SCM shared_spanners;
+  if (share->here_defined (ly_symbol2scm ("sharedSpanners"), &shared_spanners))
     {
-      spanners.push_back (unsmob<Spanner> (scm_car (spanner_list)));
-      spanner_list = scm_cdr (spanner_list);
+      SCM spanner_list = scm_assoc_ref (shared_spanners, key (spanner_id));
+      while (scm_is_pair (spanner_list))
+        {
+          spanners.push_back (unsmob<Spanner> (scm_car (spanner_list)));
+          spanner_list = scm_cdr (spanner_list);
+        }
     }
 
   return spanners;
@@ -175,20 +191,24 @@ Spanner_engraver::get_shared_spanners (Context *share, SCM spanner_id)
 void
 Spanner_engraver::delete_shared_spanner (Context *share, SCM spanner_id)
 {
-  share->set_property ("sharedSpanners",
-                       scm_assoc_remove_x (share->get_property ("sharedSpanners"),
-                                           key (spanner_id)));
+  SCM shared_spanners;
+  if (share->here_defined (ly_symbol2scm ("sharedSpanners"), &shared_spanners))
+    share->set_property ("sharedSpanners",
+                         scm_assoc_remove_x (shared_spanners, key (spanner_id)));
+                                           
 }
 
 void
 Spanner_engraver::add_shared_spanner (Context *share, SCM spanner_id, Spanner *span)
 {
-  SCM shared_spanners = share->get_property ("sharedSpanners");
-  SCM spanner_list = scm_assoc_ref (shared_spanners, key (spanner_id));
+  SCM shared_spanners;
+  if (!share->here_defined (ly_symbol2scm ("sharedSpanners"), &shared_spanners))
+    shared_spanners = SCM_EOL;
 
+  SCM spanner_list = scm_assoc_ref (shared_spanners, key (spanner_id));
   spanner_list = scm_is_false (spanner_list)
-                 ? scm_list_1 (span)              // Create new list
-                 : scm_cons (span, spanner_list); // Add spanner to existing list
+                 ? scm_list_1 (span->self_scm ())              // Create new list
+                 : scm_cons (span->self_scm (), spanner_list); // Add spanner to existing list
                                      
   share->set_property ("sharedSpanners",
                        scm_assoc_set_x (shared_spanners,

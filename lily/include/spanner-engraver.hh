@@ -26,6 +26,9 @@ protected:
     Stream_event *ev_;
     // Additional information
     SCM info_;
+    Event_info (Stream_event *ev, SCM info)
+      : ev_ (ev), info_ (info)
+    { }
   };
   vector<Event_info> start_events_;
   vector<Event_info> stop_events_;
@@ -36,11 +39,13 @@ protected:
 //  #define LISTEN_SPANNER_EVENT_ONCE(...)
   void listen_spanner_event_once (Stream_event *ev, SCM info, bool warn_duplicate = true);
 
-  void process_stop_events (void (*callback) (Stream_event *ev, SCM info, Spanner *span));
-  void process_start_events (void (*callback) (Stream_event *ev, SCM info));
+  void process_stop_events ();
+  void process_start_events ();
+  virtual void stop_event_callback (Stream_event *ev, SCM info, Spanner *span);
+  virtual void start_event_callback (Stream_event *ev, SCM info);
 
-  #define make_multi_spanner(x, cause, event)                    \
-    internal_make_multi_spanner (ly_symbol2scm (x), cause, event  \
+  #define make_multi_spanner(x, cause, event)                     \
+    internal_make_multi_spanner (ly_symbol2scm (x), cause, event, \
                                  __FILE__, __LINE__, __FUNCTION__)
   Spanner *internal_make_multi_spanner (SCM x, SCM cause, Stream_event *event,
                                         char const *file, int line, char const *fun);
@@ -49,14 +54,7 @@ protected:
 
   virtual void derived_mark () const;
 
-  inline void stop_timestep_clear ()
-  {
-    start_events_.clear ();
-    stop_events_.clear ();
-    finished_spanners_.clear ();
-  }
-
-
+  void stop_timestep_clear ();
 
 protected:
   Context *get_share_context (SCM s);
@@ -64,14 +62,14 @@ protected:
   // Get the spanner(s) in a context with an id
   // If spanner-list has more than one spanner, the first function warns
   // and returns the first spanner
-  static Spanner *get_shared_spanner (Context *share, SCM spanner_id);
-  static vector<Spanner *> get_shared_spanners (Context *share, SCM spanner_id);
+  Spanner *get_shared_spanner (Context *share, SCM spanner_id);
+  vector<Spanner *> get_shared_spanners (Context *share, SCM spanner_id);
 
   // Delete spanner(s) from share's sharedSpanners property
-  static void delete_shared_spanner (Context *share, SCM spanner_id);
+  void delete_shared_spanner (Context *share, SCM spanner_id);
 
   // Add spanner to share's sharedSpanners property
-  static void add_shared_spanner (Context *share, SCM spanner_id, Spanner *span);
+  void add_shared_spanner (Context *share, SCM spanner_id, Spanner *span);
 
 private:
   inline SCM key (SCM spanner_id)

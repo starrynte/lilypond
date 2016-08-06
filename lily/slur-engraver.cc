@@ -19,7 +19,6 @@
 
 #include "context.hh"
 #include "directional-element-interface.hh"
-#include "international.hh"
 #include "note-column.hh"
 #include "pointer-group-interface.hh"
 #include "slur-engraver.hh"
@@ -98,7 +97,7 @@ ADD_TRANSLATOR (Slur_engraver,
 void
 Slur_engraver::listen_note_slur (Stream_event *ev, Stream_event *note)
 {
-  listen_spanner_event_once (ev, note ? SCM_EOL : note->self_scm (), false);
+  listen_spanner_event_once (ev, note ? note->self_scm () : SCM_EOL, false);
 }
 
 void
@@ -155,7 +154,6 @@ Slur_engraver::acknowledge_script (Grob_info info)
     acknowledge_extra_object (info);
 }
 
-// call multiple times if the event is associated with multiple spanners?
 void
 Slur_engraver::stop_event_callback (Stream_event *ev, SCM note, Spanner *slur)
 {
@@ -191,9 +189,9 @@ Slur_engraver::start_event_callback (Stream_event *ev, SCM note)
 void
 Slur_engraver::process_music ()
 {
-  process_stop_events (&Slur_engraver::stop_event_callback);
+  process_stop_events ();
 
-  process_start_events (&Slur_engraver::start_event_callback);
+  process_start_events ();
 
   set_melisma (current_spanners_.size ());
 }

@@ -28,20 +28,8 @@
 class Slur_engraver : public Spanner_engraver
 {
 protected:
-  struct Event_info
-  {
-    Stream_event *slur_, *note_;
-    Event_info (Stream_event *slur, Stream_event *note)
-      : slur_ (slur), note_ (note)
-    { }
-  };
-  // protected so that subclasses can see them
-  vector<Event_info> start_events_;
-  vector<Event_info> stop_events_;
-
   typedef std::multimap<Stream_event *, Spanner *> Note_slurs;
   Drul_array<Note_slurs> note_slurs_;
-  vector<Grob *> end_slurs_;
   vector<Grob_info> objects_to_acknowledge_;
 
   virtual SCM event_symbol () const;
@@ -60,14 +48,12 @@ protected:
   void acknowledge_extra_object (Grob_info);
   void stop_translation_timestep ();
 
-  void stop_event_callback (Stream_event *ev, SCM note, Spanner *slur);
-  void start_event_callback (Stream_event *ev, SCM note);
+  virtual void stop_event_callback (Stream_event *ev, SCM note, Spanner *slur);
+  virtual void start_event_callback (Stream_event *ev, SCM note);
   void create_slur (Stream_event *ev, SCM note, Direction dir);
   void process_music ();
 
-
   virtual void set_melisma (bool);
-  virtual void derived_mark () const;
 
 public:
   TRANSLATOR_DECLARATIONS (Slur_engraver);
