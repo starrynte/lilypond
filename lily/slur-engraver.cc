@@ -67,16 +67,16 @@ Slur_engraver::set_melisma (bool m)
 void
 Slur_engraver::boot ()
 {
-  ADD_LISTENER (Slur_engraver, slur);
-  ADD_LISTENER (Slur_engraver, note);
-  ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, inline_accidental);
-  ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, fingering);
-  ADD_ACKNOWLEDGER (Slur_engraver, note_column);
-  ADD_ACKNOWLEDGER (Slur_engraver, script);
-  ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, text_script);
-  ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, dots);
-  ADD_END_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, tie);
-  ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, tuplet_number);
+  ADD_SPANNER_FILTERED_LISTENER (Slur_engraver, slur);
+  ADD_SPANNER_LISTENER (Slur_engraver, note);
+  ADD_SPANNER_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, inline_accidental);
+  ADD_SPANNER_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, fingering);
+  ADD_SPANNER_ACKNOWLEDGER (Slur_engraver, note_column);
+  ADD_SPANNER_ACKNOWLEDGER (Slur_engraver, script);
+  ADD_SPANNER_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, text_script);
+  ADD_SPANNER_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, dots);
+  ADD_SPANNER_END_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, tie);
+  ADD_SPANNER_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, tuplet_number);
 }
 
 ADD_TRANSLATOR (Slur_engraver,
@@ -95,9 +95,9 @@ ADD_TRANSLATOR (Slur_engraver,
                );
 
 void
-Slur_engraver::listen_note_slur (Stream_event *ev, Stream_event *note)
+Slur_engraver::listen_note_slur (pair<Stream_event *, Stream_event *>)
 {
-  listen_spanner_event_once (ev, note ? note->self_scm () : SCM_EOL, false);
+//  listen_spanner_event_once (ev, note ? note->self_scm () : SCM_EOL, false);
 }
 
 void
@@ -108,7 +108,10 @@ Slur_engraver::listen_note (Stream_event *ev)
     {
       Stream_event *art = unsmob<Stream_event> (scm_car (arts));
       if (art->in_event_class (event_symbol ()))
-        listen_note_slur (art, ev);
+        call_spanner_filtered<pair<Stream_event *, Stream_event *> >
+        (get_share_context (ev->get_property ("spanner-share-context")),
+         ev->get_property ("spanner-id"),
+         &Slur_engraver::listen_note_slur, pair<Stream_event *, Stream_event *> (art, ev));
     }
 }
 
@@ -116,10 +119,10 @@ void
 Slur_engraver::acknowledge_note_column (Grob_info info)
 {
   Grob *e = info.grob ();
-  for (vsize i = 0; i < current_spanners_.size (); i++)
-    Slur::add_column (current_spanners_[i], e);
-  for (vsize i = 0; i < finished_spanners_.size (); i++)
-    Slur::add_column (finished_spanners_[i], e);
+  if (current_spanner_)
+    Slur::add_column (current_spanner_, e);
+  if (finished_spanner_)
+    Slur::add_column (finished_spanner_, e);
   // Now cater for slurs starting/ending at a notehead: those override
   // the column bounds
   if (note_slurs_[START].empty () && note_slurs_[STOP].empty ())
@@ -166,7 +169,9 @@ Slur_engraver::stop_event_callback (Stream_event *ev, SCM note, Spanner *slur)
 void
 Slur_engraver::create_slur (Stream_event *ev, SCM note, Direction dir)
 {
-  Spanner *slur = make_multi_spanner (grob_symbol (), ev->self_scm (), ev);
+  Context *share = get_share_context (ev->get_property ("spanner-share-context"));
+  SCM id = ev->get_property ("spanner-id");
+  Spanner *slur = make_multi_spanner (grob_symbol (), ev->self_scm (), share, id);
   if (dir)
     set_grob_direction (slur, dir);
   if (!scm_is_null (note))
@@ -201,30 +206,29 @@ Slur_engraver::stop_translation_timestep ()
 {
   if (Grob *g = unsmob<Grob> (get_property ("currentCommandColumn")))
     {
-      for (vsize i = 0; i < finished_spanners_.size (); i++)
-        Slur::add_extra_encompass (finished_spanners_[i], g);
+      if (finished_spanner_)
+        Slur::add_extra_encompass (finished_spanner_, g);
 
       if (!start_events_.size ())
         {
-          for (vsize i = 0; i < current_spanners_.size (); i++)
-            Slur::add_extra_encompass (current_spanners_[i], g);
+          if (current_spanner_)
+            Slur::add_extra_encompass (current_spanner_, g);
         }
     }
 
-  for (vsize i = 0; i < finished_spanners_.size (); i++)
+  if (finished_spanner_)
     {
-      if (!finished_spanners_[i]->get_bound (RIGHT))
-        finished_spanners_[i]
+      if (!finished_spanner_->get_bound (RIGHT))
+        finished_spanner_
           ->set_bound (RIGHT, unsmob<Grob> (get_property ("currentMusicalColumn")));
     }
 
   for (vsize i = 0; i < objects_to_acknowledge_.size (); i++)
     Slur::auxiliary_acknowledge_extra_object (objects_to_acknowledge_[i],
-                                              current_spanners_,
-                                              finished_spanners_);
+                                              current_spanner_,
+                                              finished_spanner_);
 
   note_slurs_[LEFT].clear ();
   note_slurs_[RIGHT].clear ();
   objects_to_acknowledge_.clear ();
-  stop_timestep_clear ();
 }

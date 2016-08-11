@@ -25,12 +25,13 @@
 #include "spanner-engraver.hh"
 #include <map>
 
-class Slur_engraver : public Spanner_engraver
+class Slur_engraver : public Spanner_engraver<Slur_engraver>
 {
 protected:
   typedef std::multimap<Stream_event *, Spanner *> Note_slurs;
   Drul_array<Note_slurs> note_slurs_;
   vector<Grob_info> objects_to_acknowledge_;
+  Spanner *finished_spanner_;
 
   virtual SCM event_symbol () const;
   virtual bool double_property () const;
@@ -43,8 +44,8 @@ protected:
   void listen_note (Stream_event *ev);
   // A slur on an in-chord note is not actually announced as an event
   // but rather produced by the note listener.
-  void listen_note_slur (Stream_event *ev, Stream_event *note);
-  void listen_slur (Stream_event *ev) { listen_note_slur (ev, 0); }
+  void listen_note_slur (pair<Stream_event *, Stream_event *>);
+  void listen_slur (Stream_event *ev) { listen_note_slur (pair<Stream_event *, Stream_event *> (ev, 0)); }
   void acknowledge_extra_object (Grob_info);
   void stop_translation_timestep ();
 
@@ -57,6 +58,7 @@ protected:
 
 public:
   TRANSLATOR_DECLARATIONS (Slur_engraver);
+  TRANSLATOR_INHERIT (Spanner_engraver<Slur_engraver>);
 };
 
 #endif // SLUR_ENGRAVER_HH
