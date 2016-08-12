@@ -11,8 +11,8 @@
 #include <utility>
 
 // Based on definitions in translator.icc
-// Callbacks are first redirected through <a Spanner_engraver function>.
-// The appropriate callbacks on the child instances are then called.
+// Callbacks are first redirected through spanner_acknowledge/spanner_listen
+// The appropriate callbacks on the child instances are then called
 #define ADD_SPANNER_ACKNOWLEDGER_FULL(CLASS, NAME, GROB, DIRECTION, FILTERED)        \
   add_acknowledger                                                                   \
   (method_finder                                                                     \
@@ -74,10 +74,13 @@
 template <class T>
 class Spanner_engraver : public Engraver
 {
+public:
+  Spanner_engraver<T> ()
+  { instance_map_ = 0; }
 private:
   // (spanner-share-context . spanner-id) -> engraver-list
-  // TODO destructor
-  Scheme_hash_table *child_instances;
+  Scheme_hash_table *instance_map_;
+  vector<T *> child_instances_;
 
 protected:
   DECLARE_TRANSLATOR_CALLBACKS (Spanner_engraver);
@@ -86,10 +89,16 @@ protected:
   void spanner_acknowledge (Grob_info info)
   {
     if (filtered)
-      call_spanner_filtered<Grob_info> (NULL, SCM_EOL, callback, info);
+      {
+        Grob *grob = info.grob ();
+        call_spanner_filtered<Grob_info> (grob->get_property ("spanner-share-context"),
+                                          grob->get_property ("spanner-id"),
+                                          callback, info);
+      }
     else
       {
-        // call on each child instance
+        for (vsize i = 0; i < child_instances_.size (); i++)
+          (child_instances_[i]->*callback) (info);
       }
   }
 
@@ -97,23 +106,31 @@ protected:
   void spanner_listen (Stream_event *ev)
   {
     if (filtered)
-      call_spanner_filtered<Stream_event *> (NULL, SCM_EOL, callback, ev);
+      {
+        // TODO can't directly use spanner-share-context, or need to default to Voice
+        call_spanner_filtered<Stream_event *> (ev->get_property ("spanner-share-context"),
+                                               ev->get_property ("spanner-id"),
+                                               callback, ev);
+      }
+    else
+      {
+        for (vsize i = 0; i < child_instances_.size (); i++)
+          (child_instances_[i]->*callback) (ev);
+      }
   }
 
   template <class ParameterType>
   void call_spanner_filtered (SCM share_context, SCM spanner_id,
                               void (T::*callback)(ParameterType), ParameterType argument)
   {
-    SCM key = scm_cons (share_context, spanner_id);
-    SCM instances = child_instances->get (key);
+    // TODO use alist instead? since key has to be symbol for hashtable
+//    SCM key = scm_cons (share_context, spanner_id);
+    // TODO initialize somewhere better?
+    if (!instance_map_)
+      instance_map_ = unsmob<Scheme_hash_table> (Scheme_hash_table::make_smob ());
+    SCM instances;
 
-    if (scm_is_null (instances))
-      {
-        T *instance = create_new_instance (share_context, spanner_id);
-        (instance->*callback) (argument);
-        child_instances->set (key, scm_list_1 (instance->self_scm ()));
-      }
-    else
+    if (instance_map_->try_retrieve (spanner_id, &instances))
       {
         while (scm_is_pair (instances))
           {
@@ -123,17 +140,31 @@ protected:
             instances = scm_cdr (instances);
           }
       }
+    else
+      {
+        T *instance = create_new_instance ();
+        instance_map_->set (spanner_id, scm_list_1 (instance->self_scm ()));
+        child_instances_.push_back (instance);
+        (instance->*callback) (argument);
+      }
   }
 
-  T *create_new_instance (SCM share_context, SCM spanner_id)
+  T *create_new_instance ()
   {
     T *instance = static_cast<T *> (clone ());
-    instance->daddy_context_ = daddy_context_;
     instance->unprotect ();
-    instance->connect_to_context (daddy_context_);
+
+    instance->daddy_context_ = daddy_context_;
+    // Each instance shares same pointer to hash table
+    instance->instance_map_ = instance_map_;
+    // TODO make child_instances_ a pointer?
 
     return instance;
   }
+
+// TODO
+//  virtual void finalize ()
+//  { scm_gc_unprotect_object (instance_map_->self_scm ()); }
 
 // The following only have meaning in a child engraver instance
 protected:

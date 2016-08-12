@@ -56,6 +56,8 @@ Slur_engraver::object_name () const
 
 Slur_engraver::Slur_engraver ()
 {
+  current_spanner_ = 0;
+  finished_spanner_ = 0;
 }
 
 void
@@ -162,8 +164,6 @@ Slur_engraver::acknowledge_script (Grob_info info)
 void
 Slur_engraver::create_slur (Event_info evi, Direction dir)
 {
-  Context *share = get_share_context (evi.slur_->get_property ("spanner-share-context"));
-  SCM id = evi.slur_->get_property ("spanner-id");
   Spanner *slur = make_multi_spanner (grob_symbol (), evi.slur_->self_scm (),
                                       evi.slur_->get_property ("spanner-share-context"),
                                       evi.slur_->get_property ("spanner-id"));
