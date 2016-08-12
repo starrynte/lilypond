@@ -1,9 +1,13 @@
 #ifndef SPANNER_ENGRAVER_HH
 #define SPANNER_ENGRAVER_HH
 
+#include "context.hh"
 #include "engraver.hh"
+#include "scm-hash.hh"
+#include "spanner.hh"
 #include "std-string.hh"
 #include "std-vector.hh"
+#include "stream-event.hh"
 #include <utility>
 
 // Based on definitions in translator.icc
@@ -67,12 +71,12 @@
 // The current voice a spanner belongs to is stored in the spanner property
 // current-engraver.
 
-class Context;
-class Stream_event;
 template <class T>
 class Spanner_engraver : public Engraver
 {
 private:
+  // (spanner-share-context . spanner-id) -> engraver-list
+  // TODO destructor
   Scheme_hash_table *child_instances;
 
 protected:
@@ -93,55 +97,153 @@ protected:
   void spanner_listen (Stream_event *ev)
   {
     if (filtered)
-      call_spanner_filtered<Stream_event *> (ev);
+      call_spanner_filtered<Stream_event *> (NULL, SCM_EOL, callback, ev);
   }
 
   template <class ParameterType>
   void call_spanner_filtered (SCM share_context, SCM spanner_id,
                               void (T::*callback)(ParameterType), ParameterType argument)
   {
-    T *instance;
     SCM key = scm_cons (share_context, spanner_id);
-    SCM instance_scm = child_instances->get (key);
-    if (scm_is_null (instance_scm))
+    SCM instances = child_instances->get (key);
+
+    if (scm_is_null (instances))
       {
-        // instance = clone
+        T *instance = create_new_instance (share_context, spanner_id);
+        (instance->*callback) (argument);
+        child_instances->set (key, scm_list_1 (instance->self_scm ()));
       }
     else
-        instance = unsmob<T> (instance_scm);
- 
-    (instance->*callback) (argument);
+      {
+        while (scm_is_pair (instances))
+          {
+            T *instance = unsmob<T> (scm_car (instances));
+            (instance->*callback) (argument);
+
+            instances = scm_cdr (instances);
+          }
+      }
+  }
+
+  T *create_new_instance (SCM share_context, SCM spanner_id)
+  {
+    T *instance = static_cast<T *> (clone ());
+    instance->daddy_context_ = daddy_context_;
+    instance->unprotect ();
+    instance->connect_to_context (daddy_context_);
+
+    return instance;
   }
 
 // The following only have meaning in a child engraver instance
 protected:
   // When a spanner changes voices, this needs to be set to NULL
   // in the engraver originally containing the spanner
-  // TODO what about double slurs
+  // TODO double slurs
   Spanner *current_spanner_;
 
   #define make_multi_spanner(x, cause, share, id)                     \
     internal_make_multi_spanner (ly_symbol2scm (x), cause, share, id, \
                                  __FILE__, __LINE__, __FUNCTION__)
-  Spanner *internal_make_multi_spanner (SCM x, SCM cause, Context *share, SCM id,
-                                        char const *file, int line, char const *fun);
+  Spanner *internal_make_multi_spanner (SCM x, SCM cause, SCM share, SCM id,
+                                        char const *file, int line, char const *fun)
+  {
+    Spanner *span = internal_make_spanner (x, cause, file, line, fun);
+    span->set_property ("spanner-id", id);
+    span->set_property ("spanner-share-context", share);
+    span->set_property ("current-engraver", self_scm ());
 
-  void end_spanner (Spanner *span, SCM cause, bool announce = true);
+    current_spanner_ = span;
+
+    add_shared_spanner (get_share_context (share), id, span);
+
+    return span;
+  }
+
+  void end_spanner (Spanner *span, SCM cause, bool announce = true)
+  {
+    Spanner_engraver *owner
+      = unsmob<Spanner_engraver> (span->get_property ("current-engraver"));
+    owner->current_spanner_ = NULL;
+
+    if (announce)
+      announce_end_grob (span, cause);
+
+    SCM id = span->get_property ("spanner-id");
+    Context *share = get_share_context (span->get_property ("spanner-share-context"));
+    // TODO may be called multiple times: need to check?
+    delete_shared_spanner (share, id);
+  }
 
 protected:
-  Context *get_share_context (SCM s);
+  Context *get_share_context (SCM s)
+  {
+    Context *share = find_context_above (context (), s);
+    return (share == NULL) ? context () : share;
+  }
 
   // Get the spanner(s) in a context with an id
   // If spanner-list has more than one spanner, the first function warns
   // and returns the first spanner
-  Spanner *get_shared_spanner (Context *share, SCM spanner_id);
-  vector<Spanner *> get_shared_spanners (Context *share, SCM spanner_id);
+  Spanner *get_shared_spanner (Context *share, SCM spanner_id)
+  {
+    SCM shared_spanners;
+    if (!share->here_defined (ly_symbol2scm ("sharedSpanners"), &shared_spanners))
+      return NULL;
+
+    SCM spanner_list = scm_assoc_ref (shared_spanners, key (spanner_id));
+    if (scm_is_false (spanner_list) || !scm_is_pair (spanner_list))
+      return NULL;
+
+    if (scm_is_pair (scm_cdr (spanner_list)))
+      warning ("Requested one spanner when multiple present");
+
+    return unsmob<Spanner> (scm_car (spanner_list));
+  }
+
+  vector<Spanner *> get_shared_spanners (Context *share, SCM spanner_id)
+  {
+    vector<Spanner *> spanners;
+    SCM shared_spanners;
+    if (share->here_defined (ly_symbol2scm ("sharedSpanners"), &shared_spanners))
+      {
+        SCM spanner_list = scm_assoc_ref (shared_spanners, key (spanner_id));
+        while (scm_is_pair (spanner_list))
+          {
+            spanners.push_back (unsmob<Spanner> (scm_car (spanner_list)));
+            spanner_list = scm_cdr (spanner_list);
+          }
+      }
+
+    return spanners;
+  }
 
   // Delete spanner(s) from share's sharedSpanners property
-  void delete_shared_spanner (Context *share, SCM spanner_id);
+  void delete_shared_spanner (Context *share, SCM spanner_id)
+  {
+    SCM shared_spanners;
+    if (share->here_defined (ly_symbol2scm ("sharedSpanners"), &shared_spanners))
+      share->set_property ("sharedSpanners",
+                           scm_assoc_remove_x (shared_spanners, key (spanner_id)));
+  }
 
   // Add spanner to share's sharedSpanners property
-  void add_shared_spanner (Context *share, SCM spanner_id, Spanner *span);
+  void add_shared_spanner (Context *share, SCM spanner_id, Spanner *span)
+  {
+    SCM shared_spanners;
+    if (!share->here_defined (ly_symbol2scm ("sharedSpanners"), &shared_spanners))
+      shared_spanners = SCM_EOL;
+
+    SCM spanner_list = scm_assoc_ref (shared_spanners, key (spanner_id));
+    spanner_list = scm_is_false (spanner_list)
+                   ? scm_list_1 (span->self_scm ())              // Create new list
+                   : scm_cons (span->self_scm (), spanner_list); // Add spanner to existing list
+                                       
+    share->set_property ("sharedSpanners",
+                         scm_assoc_set_x (shared_spanners,
+                                          key (spanner_id), spanner_list));
+  }
+  // TODO inline
 
 private:
   inline SCM key (SCM spanner_id)

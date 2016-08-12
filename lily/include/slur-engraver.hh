@@ -28,10 +28,28 @@
 class Slur_engraver : public Spanner_engraver<Slur_engraver>
 {
 protected:
+  struct Event_info {
+    Stream_event *slur_, *note_;
+
+    Event_info ()
+      : slur_ (NULL), note_ (NULL)
+    { }
+
+    Event_info (Stream_event *slur, Stream_event *note)
+      : slur_ (slur), note_ (note)
+    { }
+
+    Event_info (const Event_info& evi)
+      : slur_ (evi.slur_), note_ (evi.note_)
+    { }
+  };
+  // TODO default initialize
+  Drul_array<Event_info> spanner_events_;
+
   typedef std::multimap<Stream_event *, Spanner *> Note_slurs;
   Drul_array<Note_slurs> note_slurs_;
-  vector<Grob_info> objects_to_acknowledge_;
   Spanner *finished_spanner_;
+  vector<Grob_info> objects_to_acknowledge_;
 
   virtual SCM event_symbol () const;
   virtual bool double_property () const;
@@ -44,14 +62,12 @@ protected:
   void listen_note (Stream_event *ev);
   // A slur on an in-chord note is not actually announced as an event
   // but rather produced by the note listener.
-  void listen_note_slur (pair<Stream_event *, Stream_event *>);
-  void listen_slur (Stream_event *ev) { listen_note_slur (pair<Stream_event *, Stream_event *> (ev, 0)); }
+  void listen_note_slur (Event_info evi);
+  void listen_slur (Stream_event *ev) { listen_note_slur (Event_info (ev, 0)); }
   void acknowledge_extra_object (Grob_info);
   void stop_translation_timestep ();
 
-  virtual void stop_event_callback (Stream_event *ev, SCM note, Spanner *slur);
-  virtual void start_event_callback (Stream_event *ev, SCM note);
-  void create_slur (Stream_event *ev, SCM note, Direction dir);
+  void create_slur (Event_info evi, Direction dir);
   void process_music ();
 
   virtual void set_melisma (bool);
