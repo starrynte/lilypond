@@ -71,6 +71,7 @@ protected:
   void process_music ();
 
   virtual void set_melisma (bool);
+  virtual void derived_mark () const;
 
 public:
   TRANSLATOR_DECLARATIONS (Slur_engraver);

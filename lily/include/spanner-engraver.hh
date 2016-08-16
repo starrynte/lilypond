@@ -269,7 +269,7 @@ protected:
     spanner_list = scm_is_false (spanner_list)
                    ? scm_list_1 (span->self_scm ())              // Create new list
                    : scm_cons (span->self_scm (), spanner_list); // Add spanner to existing list
-                                       
+ 
     share->set_property ("sharedSpanners",
                          scm_assoc_set_x (shared_spanners,
                                           key (spanner_id), spanner_list));

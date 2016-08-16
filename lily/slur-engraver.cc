@@ -97,16 +97,33 @@ ADD_TRANSLATOR (Slur_engraver,
                );
 
 void
+Slur_engraver::derived_mark () const
+{
+  if (spanner_events_[START].slur_)
+    scm_gc_mark (spanner_events_[START].slur_->self_scm ());
+  if (spanner_events_[START].note_)
+    scm_gc_mark (spanner_events_[START].note_->self_scm ());
+
+  if (spanner_events_[STOP].slur_)
+    scm_gc_mark (spanner_events_[STOP].slur_->self_scm ());
+  if (spanner_events_[STOP].note_)
+    scm_gc_mark (spanner_events_[STOP].note_->self_scm ());
+}
+
+void
 Slur_engraver::listen_note_slur (Event_info evi)
 {
+  debug_output ("listennoteslur");
   // TODO assign "once"
   Direction dir = to_dir (evi.slur_->get_property ("span-direction"));
   spanner_events_[dir] = evi;
+  debug_output (spanner_events_[START].slur_ ? "listen START true" : "ic");
 }
 
 void
 Slur_engraver::listen_note (Stream_event *ev)
 {
+  debug_output ("listennote");
   for (SCM arts = ev->get_property ("articulations");
        scm_is_pair (arts); arts = scm_cdr (arts))
     {
@@ -176,6 +193,7 @@ Slur_engraver::create_slur (Event_info evi, Direction dir)
 void
 Slur_engraver::process_music ()
 {
+  debug_output ("process_music");
   if (spanner_events_[STOP].slur_)
     {
       SCM id = spanner_events_[STOP].slur_->get_property ("spanner-id");
@@ -191,6 +209,7 @@ Slur_engraver::process_music ()
 
   if (spanner_events_[START].slur_)
     {
+      debug_output ("START pm");
       // TODO double slurs
       Direction dir = to_dir (spanner_events_[START].slur_->get_property ("direction"));
       create_slur (spanner_events_[START], dir);
