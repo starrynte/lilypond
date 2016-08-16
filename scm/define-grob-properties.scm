@@ -1377,6 +1377,8 @@ Grobs that are positioned around such beams are also @code{cross-staff}.
 Grobs that are grouping objects, however, like @code{VerticalAxisGroups}
 will not in general be marked @code{cross-staff} when some of the members
 of the group are @code{cross-staff}.")
+     (current-engraver ,ly:translator? "Engraver instance currently responsible
+for this grob. Used for cross-voice spanners.")
 
      (delta-position ,number? "The vertical position difference.")
 

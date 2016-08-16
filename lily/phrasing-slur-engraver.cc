@@ -70,17 +70,17 @@ Phrasing_slur_engraver::set_melisma (bool)
 void
 Phrasing_slur_engraver::boot ()
 {
-  ADD_LISTENER_FOR (Phrasing_slur_engraver, slur, phrasing_slur);
-  ADD_LISTENER (Phrasing_slur_engraver, note);
-  ADD_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, inline_accidental);
-  ADD_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, fingering);
-  ADD_ACKNOWLEDGER (Phrasing_slur_engraver, note_column);
-  ADD_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, slur);
-  ADD_ACKNOWLEDGER (Phrasing_slur_engraver, script);
-  ADD_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, dots);
-  ADD_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, text_script);
-  ADD_END_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, tie);
-  ADD_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, tuplet_number);
+  ADD_SPANNER_LISTENER_FOR (Phrasing_slur_engraver, slur, phrasing_slur);
+  ADD_SPANNER_LISTENER (Phrasing_slur_engraver, note);
+  ADD_SPANNER_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, inline_accidental);
+  ADD_SPANNER_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, fingering);
+  ADD_SPANNER_ACKNOWLEDGER (Phrasing_slur_engraver, note_column);
+  ADD_SPANNER_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, slur);
+  ADD_SPANNER_ACKNOWLEDGER (Phrasing_slur_engraver, script);
+  ADD_SPANNER_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, dots);
+  ADD_SPANNER_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, text_script);
+  ADD_SPANNER_END_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, tie);
+  ADD_SPANNER_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, tuplet_number);
 }
 
 ADD_TRANSLATOR (Phrasing_slur_engraver,

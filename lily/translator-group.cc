@@ -33,6 +33,9 @@
 #include "performer-group.hh"
 #include "scheme-engraver.hh"
 #include "scm-hash.hh"
+#include "spanner.hh"
+#include "spanner-engraver.hh"
+#include "stream-event.hh"
 #include "warn.hh"
 
 void
@@ -84,6 +87,25 @@ Translator_group::disconnect_from_context ()
 void
 Translator_group::finalize ()
 {
+  SCM s;
+  if (!context_->here_defined (ly_symbol2scm ("sharedSpanners"), &s))
+    return;
+
+  for (; scm_is_pair (s); s = scm_cdr (s))
+    {
+      SCM spanner_list = scm_cdar (s);
+      while (scm_is_pair (spanner_list))
+        {
+          Spanner *span = unsmob<Spanner> (scm_car (spanner_list));
+          if (span->is_live ())
+            {
+              span->warning (_f ("unterminated %s", span->name ()));
+              span->suicide ();
+            }
+          spanner_list = scm_cdr (spanner_list);
+        }
+    }
+  context_->unset_property (ly_symbol2scm ("sharedSpanners"));
 }
 
 /*
@@ -305,7 +327,9 @@ Translator_group::precompute_method_bindings ()
       for (int i = 0; i < TRANSLATOR_METHOD_PRECOMPUTE_COUNT; i++)
         {
           if (!SCM_UNBNDP (ptrs[i]))
+//            { debug_output (string ("adding binding for ") + tr->class_name ());
             precomputed_method_bindings_[i].push_back (Method_instance (ptrs[i], tr));
+//            } else debug_output (string ("skipping binding for ") + tr->class_name ());
         }
     }
 
@@ -316,7 +340,10 @@ Translator_group::precomputed_translator_foreach (Translator_precompute_index id
 {
   vector<Method_instance> &bindings (precomputed_method_bindings_[idx]);
   for (vsize i = 0; i < bindings.size (); i++)
+    {
+    debug_output (string ("calling binding for ") + unsmob<Translator> (bindings[i].instance ())->class_name ());
     bindings[i]();
+    }
 }
 
 Translator_group::~Translator_group ()

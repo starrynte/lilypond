@@ -184,6 +184,7 @@ Options are @code{'text} and @code{'hairpin}.")
      (span-text ,markup? "The displayed text for dynamic text
 spanners (e.g., cresc.)")
      (spanner-id ,key? "Identifier to distinguish concurrent spanners.")
+     (spanner-share-context ,key? "Context to share this spanner in.")
      (start-callback ,procedure? "Function to compute the negative length
 of starting grace notes.  This property can only be defined as initializer
 in @file{scm/@/define-music-types.scm}.")
