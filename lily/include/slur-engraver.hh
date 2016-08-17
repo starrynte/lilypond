@@ -22,10 +22,10 @@
 #define SLUR_ENGRAVER_HH
 
 #include "engraver.hh"
-#include "spanner-engraver.hh"
+#include "spanner-engraver-instance.hh"
 #include <map>
 
-class Slur_engraver : public Spanner_engraver<Slur_engraver>
+class Slur_engraver : public Spanner_engraver_instance
 {
 protected:
   struct Event_info {
@@ -74,8 +74,7 @@ protected:
   virtual void derived_mark () const;
 
 public:
-  TRANSLATOR_DECLARATIONS (Slur_engraver);
-  TRANSLATOR_INHERIT (Spanner_engraver<Slur_engraver>);
+  SPANNER_ENGRAVER_INSTANCE_DECLARATIONS (Slur_engraver);
 };
 
 #endif // SLUR_ENGRAVER_HH

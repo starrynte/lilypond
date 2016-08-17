@@ -28,7 +28,7 @@
 #include "std-vector.hh"
 #include "warn.hh"
 
-#include "translator.icc"
+#include "spanner-engraver.icc"
 
 SCM
 Slur_engraver::event_symbol () const
@@ -81,7 +81,7 @@ Slur_engraver::boot ()
   ADD_SPANNER_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, tuplet_number);
 }
 
-ADD_TRANSLATOR (Slur_engraver,
+ADD_SPANNER_ENGRAVER (Slur_engraver,
                 /* doc */
                 "Build slur grobs from slur events.",
 
@@ -129,8 +129,9 @@ Slur_engraver::listen_note (Stream_event *ev)
     {
       Stream_event *art = unsmob<Stream_event> (scm_car (arts));
       if (art->in_event_class (event_symbol ()))
+      // get instance
         call_spanner_filtered<Event_info>
-        (ev->get_property ("spanner-share-context"),
+        (get_share_context (ev->get_property ("spanner-share-context")),
          ev->get_property ("spanner-id"),
          &Slur_engraver::listen_note_slur, Event_info (art, ev));
     }

@@ -1,0 +1,58 @@
+#ifndef SPANNER_ENGRAVER_ICC
+#define SPANNER_ENGRAVER_ICC
+
+#include "engraver.hh"
+#include "spanner-engraver.hh"
+
+#define ADD_SPANNER_ENGRAVER(classname, desc, grobs, read, write)        \
+  ADD_TRANSLATOR (Spanner_engraver<classname>, desc, grobs, read, write) \
+
+#define ADD_SPANNER_ACKNOWLEDGER_FULL(CLASS, NAME, GROB, DIRECTION, FILTERED)        \
+  add_acknowledger                                                                   \
+  (Spanner_engraver<CLASS>::method_finder                                            \
+   <&Spanner_engraver<CLASS>::spanner_acknowledge<&CLASS::acknowledge_ ## NAME, FILTERED> > \
+   (), #GROB, Spanner_engraver<CLASS>::acknowledge_static_array_drul_[DIRECTION])
+
+#define ADD_SPANNER_ACKNOWLEDGER(CLASS, NAME) \
+  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, NAME, START, false)
+
+#define ADD_SPANNER_ACKNOWLEDGER_FOR(CLASS, NAME, GROB) \
+  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, GROB, START, false)
+
+#define ADD_SPANNER_FILTERED_ACKNOWLEDGER(CLASS, NAME) \
+  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, NAME, START, true)
+
+#define ADD_SPANNER_FILTERED_ACKNOWLEDGER_FOR(CLASS, NAME, GROB) \
+  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, GROB, START, true)
+
+#define ADD_SPANNER_END_ACKNOWLEDGER(CLASS, NAME) \
+  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, NAME, STOP, false)
+
+#define ADD_SPANNER_END_ACKNOWLEDGER_FOR(CLASS, NAME, GROB) \
+  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, GROB, STOP, false)
+
+#define ADD_SPANNER_END_FILTERED_ACKNOWLEDGER(CLASS, NAME) \
+  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, NAME, STOP, true)
+
+#define ADD_SPANNER_END_FILTERED_ACKNOWLEDGER_FOR(CLASS, NAME, GROB) \
+  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, GROB, STOP, true)
+
+#define ADD_SPANNER_LISTENER_FULL(CLASS, NAME, EVENT, FILTERED)         \
+  Spanner_engraver<CLASS>::listener_list_ = scm_acons                                            \
+    (event_class_symbol (#EVENT), Spanner_engraver<CLASS>::method_finder                              \
+     <&Spanner_engraver<CLASS>::spanner_listen<&CLASS::listen_ ## NAME, FILTERED> > \
+     (), Spanner_engraver<CLASS>::listener_list_)
+
+#define ADD_SPANNER_LISTENER(CLASS, NAME) \
+  ADD_SPANNER_LISTENER_FULL (CLASS, NAME, NAME, false);
+
+#define ADD_SPANNER_LISTENER_FOR(CLASS, NAME, EVENT) \
+  ADD_SPANNER_LISTENER_FULL (CLASS, NAME, EVENT, false);
+
+#define ADD_SPANNER_FILTERED_LISTENER(CLASS, NAME) \
+  ADD_SPANNER_LISTENER_FULL (CLASS, NAME, NAME, true);
+
+#define ADD_SPANNER_FILTERED_LISTENER_FOR(CLASS, NAME, EVENT) \
+  ADD_SPANNER_LISTENER_FULL (CLASS, NAME, EVENT, true);
+
+#endif /* SPANNER_ENGRAVER_ICC */
