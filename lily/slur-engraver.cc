@@ -69,16 +69,16 @@ Slur_engraver::set_melisma (bool m)
 void
 Slur_engraver::boot ()
 {
-  ADD_SPANNER_FILTERED_LISTENER (Slur_engraver, slur);
-  ADD_SPANNER_LISTENER (Slur_engraver, note);
-  ADD_SPANNER_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, inline_accidental);
-  ADD_SPANNER_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, fingering);
-  ADD_SPANNER_ACKNOWLEDGER (Slur_engraver, note_column);
-  ADD_SPANNER_ACKNOWLEDGER (Slur_engraver, script);
-  ADD_SPANNER_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, text_script);
-  ADD_SPANNER_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, dots);
-  ADD_SPANNER_END_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, tie);
-  ADD_SPANNER_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, tuplet_number);
+  ADD_FILTERED_LISTENER (Slur_engraver, Slur_engraver, slur);
+  ADD_LISTENER (Slur_engraver, note);
+  ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, inline_accidental);
+  ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, fingering);
+  ADD_ACKNOWLEDGER (Slur_engraver, note_column);
+  ADD_ACKNOWLEDGER (Slur_engraver, script);
+  ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, text_script);
+  ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, dots);
+  ADD_END_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, tie);
+  ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, tuplet_number);
 }
 
 ADD_TRANSLATOR (Slur_engraver,
@@ -129,9 +129,8 @@ Slur_engraver::listen_note (Stream_event *ev)
     {
       Stream_event *art = unsmob<Stream_event> (scm_car (arts));
       if (art->in_event_class (event_symbol ()))
-        call_spanner_filtered<Event_info>
-        (ev->get_property ("spanner-share-context"),
-         ev->get_property ("spanner-id"),
+        call_spanner_filtered<Slur_engraver, Event_info>
+        (ev->get_property ("spanner-id"),
          &Slur_engraver::listen_note_slur, Event_info (art, ev));
     }
 }

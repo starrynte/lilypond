@@ -8,58 +8,40 @@
 #include "std-string.hh"
 #include "std-vector.hh"
 #include "stream-event.hh"
+#include "translator-group.hh"
 #include <utility>
 
 // Based on definitions in translator.icc
-// Callbacks are first redirected through spanner_acknowledge/spanner_listen
-// The appropriate callbacks on the child instances are then called
-#define ADD_SPANNER_ACKNOWLEDGER_FULL(CLASS, NAME, GROB, DIRECTION, FILTERED)        \
-  add_acknowledger                                                                   \
-  (method_finder                                                                     \
-   <&Spanner_engraver::spanner_acknowledge<&CLASS::acknowledge_ ## NAME, FILTERED> > \
-   (), #GROB, CLASS::acknowledge_static_array_drul_[DIRECTION])
+// Filtered callbacks are sent to each child instance, but first redirected
+// through spanner_acknowledge/spanner_listen. If the id and share context
+// match, the callback is then called on the child instance.
+// TODO owners
+#define ADD_FILTERED_ACKNOWLEDGER_FULL(CLASS, NAME, GROB, DIRECTION)       \
+  add_acknowledger                                                         \
+  (method_finder                                                           \
+   <&Spanner_engraver::spanner_acknowledge<CLASS, &CLASS::acknowledge_ ## NAME> > \
+   (), #GROB, acknowledge_static_array_drul_[DIRECTION])
 
-#define ADD_SPANNER_ACKNOWLEDGER(CLASS, NAME) \
-  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, NAME, START, false)
+#define ADD_FILTERED_ACKNOWLEDGER(CLASS, NAME) \
+  ADD_FILTERED_ACKNOWLEDGER_FULL (CLASS, NAME, NAME, START)
 
-#define ADD_SPANNER_ACKNOWLEDGER_FOR(CLASS, NAME, GROB) \
-  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, GROB, START, false)
+#define ADD_FILTERED_ACKNOWLEDGER_FOR(CLASS, NAME, GROB) \
+  ADD_FILTERED_ACKNOWLEDGER_FULL (CLASS, NAME, GROB, START)
 
-#define ADD_SPANNER_FILTERED_ACKNOWLEDGER(CLASS, NAME) \
-  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, NAME, START, true)
+#define ADD_END_FILTERED_ACKNOWLEDGER(CLASS, NAME) \
+  ADD_FILTERED_ACKNOWLEDGER_FULL (CLASS, NAME, NAME, STOP)
 
-#define ADD_SPANNER_FILTERED_ACKNOWLEDGER_FOR(CLASS, NAME, GROB) \
-  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, GROB, START, true)
+#define ADD_END_FILTERED_ACKNOWLEDGER_FOR(CLASS, NAME, GROB) \
+  ADD_FILTERED_ACKNOWLEDGER_FULL (CLASS, NAME, GROB, STOP)
 
-#define ADD_SPANNER_END_ACKNOWLEDGER(CLASS, NAME) \
-  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, NAME, STOP, false)
-
-#define ADD_SPANNER_END_ACKNOWLEDGER_FOR(CLASS, NAME, GROB) \
-  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, GROB, STOP, false)
-
-#define ADD_SPANNER_END_FILTERED_ACKNOWLEDGER(CLASS, NAME) \
-  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, NAME, STOP, true)
-
-#define ADD_SPANNER_END_FILTERED_ACKNOWLEDGER_FOR(CLASS, NAME, GROB) \
-  ADD_SPANNER_ACKNOWLEDGER_FULL (CLASS, NAME, GROB, STOP, true)
-
-#define ADD_SPANNER_LISTENER_FULL(CLASS, NAME, EVENT, FILTERED)         \
+#define ADD_FILTERED_LISTENER_FOR(CLASS, OWNER, NAME, EVENT)         \
   listener_list_ = scm_acons                                            \
     (event_class_symbol (#EVENT), method_finder                              \
-     <&Spanner_engraver::spanner_listen<&CLASS::listen_ ## NAME, FILTERED> > \
+     <&Spanner_engraver::spanner_listen<OWNER, &CLASS::listen_ ## NAME> > \
      (), listener_list_)
 
-#define ADD_SPANNER_LISTENER(CLASS, NAME) \
-  ADD_SPANNER_LISTENER_FULL (CLASS, NAME, NAME, false);
-
-#define ADD_SPANNER_LISTENER_FOR(CLASS, NAME, EVENT) \
-  ADD_SPANNER_LISTENER_FULL (CLASS, NAME, EVENT, false);
-
-#define ADD_SPANNER_FILTERED_LISTENER(CLASS, NAME) \
-  ADD_SPANNER_LISTENER_FULL (CLASS, NAME, NAME, true);
-
-#define ADD_SPANNER_FILTERED_LISTENER_FOR(CLASS, NAME, EVENT) \
-  ADD_SPANNER_LISTENER_FULL (CLASS, NAME, EVENT, true);
+#define ADD_FILTERED_LISTENER(CLASS, OWNER, NAME) \
+  ADD_FILTERED_LISTENER_FOR (CLASS, OWNER, NAME, NAME)
 
 // Context property sharedSpanners is an alist:
 // (engraver-class-name . spanner-id) -> spanner-list
@@ -71,84 +53,59 @@
 // The current voice a spanner belongs to is stored in the spanner property
 // current-engraver.
 
-template <class T>
 class Spanner_engraver : public Engraver
 {
 public:
-  Spanner_engraver<T> ()
-  { instance_map_ = 0; }
+  Spanner_engraver ()
+    : instance_map_ (NULL), filter_id_ (SCM_EOL), is_manager_instance_ (true)
+  {
+  }
 private:
-  // (spanner-share-context . spanner-id) -> engraver-list
+  // spanner-id -> engraver-list
   Scheme_hash_table *instance_map_;
-  vector<T *> child_instances_;
+  SCM filter_id_;
+  bool is_manager_instance_;
 
 protected:
   DECLARE_TRANSLATOR_CALLBACKS (Spanner_engraver);
 
-  template <void (T::*callback)(Grob_info), bool filtered>
+  template <class T, void (T::*callback) (Grob_info)>
   void spanner_acknowledge (Grob_info info)
   {
-    if (filtered)
-      {
-        Grob *grob = info.grob ();
-        call_spanner_filtered<Grob_info> (grob->get_property ("spanner-share-context"),
-                                          grob->get_property ("spanner-id"),
-                                          callback, info);
-      }
-    else
-      {
-        for (vsize i = 0; i < child_instances_.size (); i++)
-          (child_instances_[i]->*callback) (info);
-      }
+    Grob *grob = info.grob ();
+    SCM id = grob->get_property ("spanner-id");
+    if (ly_is_equal (id, filter_id_))
+      (static_cast<T *> (this)->*callback) (info);
+    if (is_manager_instance_)
+      check_child_instance<T> (id);
   }
 
-  template <void (T::*callback)(Stream_event *), bool filtered>
+  template <class T, void (T::*callback) (Stream_event *)>
   void spanner_listen (Stream_event *ev)
   {
-    if (filtered)
-      {
-        // TODO can't directly use spanner-share-context, or need to default to Voice
-        call_spanner_filtered<Stream_event *> (ev->get_property ("spanner-share-context"),
-                                               ev->get_property ("spanner-id"),
-                                               callback, ev);
-      }
-    else
-      {
-        for (vsize i = 0; i < child_instances_.size (); i++)
-          (child_instances_[i]->*callback) (ev);
-      }
+    SCM id = ev->get_property ("spanner-id");
+    if (ly_is_equal (id, filter_id_))
+      (static_cast<T *> (this)->*callback) (ev);
+    if (is_manager_instance_)
+      check_child_instance<T> (id);
   }
 
-  template <class ParameterType>
-  void call_spanner_filtered (SCM share_context, SCM spanner_id,
+  template <class T, class ParameterType>
+  void call_spanner_filtered (SCM spanner_id,
                               void (T::*callback)(ParameterType), ParameterType argument)
   {
-    // TODO use alist instead? since key has to be symbol for hashtable
-//    SCM key = scm_cons (share_context, spanner_id);
-    // TODO initialize somewhere better?
-    if (!instance_map_)
-      instance_map_ = unsmob<Scheme_hash_table> (Scheme_hash_table::make_smob ());
-    SCM instances;
-
-    if (instance_map_->try_retrieve (spanner_id, &instances))
+    SCM instances = check_child_instance<T> (spanner_id);
+    while (scm_is_pair (instances))
       {
-        while (scm_is_pair (instances))
-          {
-            T *instance = unsmob<T> (scm_car (instances));
-            (instance->*callback) (argument);
-
-            instances = scm_cdr (instances);
-          }
-      }
-    else
-      {
-        T *instance = create_new_instance ();
-        instance_map_->set (spanner_id, scm_list_1 (instance->self_scm ()));
-        child_instances_.push_back (instance);
+        T *instance = unsmob<T> (scm_car (instances));
         (instance->*callback) (argument);
+        instances = scm_cdr (instances);
       }
   }
 
+/*
+// TODO needed for double slurs
+  template <class T>
   T *create_new_instance ()
   {
     T *instance = static_cast<T *> (clone ());
@@ -157,9 +114,43 @@ protected:
     instance->daddy_context_ = daddy_context_;
     // Each instance shares same pointer to hash table
     instance->instance_map_ = instance_map_;
-    // TODO make child_instances_ a pointer?
 
     return instance;
+  }
+  */
+
+private:
+  // Create new instance for the spanner id if one does not exist
+  template <class T>
+  SCM check_child_instance (SCM spanner_id)
+  {
+    if (!instance_map_)
+      instance_map_ = unsmob<Scheme_hash_table> (Scheme_hash_table::make_smob ());
+
+    SCM instances;
+    if (instance_map_->try_retrieve (spanner_id, &instances))
+      return instances;
+
+    T *instance = static_cast<T *> (clone ());
+    instance->unprotect ();
+    instance->daddy_context_ = daddy_context_;
+    instance->instance_map_ = instance_map_;
+    instance->filter_id_ = spanner_id;
+    instance->is_manager_instance_ = false;
+
+    instance->connect_to_context (daddy_context_);
+    SCM instance_scm = instance->self_scm ();
+
+    Translator_group *group = get_daddy_translator ();
+    group->simple_trans_list_ = scm_cons (instance_scm, group->simple_trans_list_);
+    // TODO can speed up
+    for (vsize i = 0; i < TRANSLATOR_METHOD_PRECOMPUTE_COUNT; i++)
+      group->precomputed_method_bindings_[i].clear ();
+    group->precompute_method_bindings ();
+
+    instances = scm_list_1 (instance_scm);
+    instance_map_->set (spanner_id, instances);
+    return instances;
   }
 
 // TODO
