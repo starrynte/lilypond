@@ -176,7 +176,8 @@ protected:                      // should be private.
   friend class Translator_group;
 };
 
-void add_translator (Translator *trans);
+void add_translator (Translator *trans, SCM sym);
+inline void add_translator (Translator *trans) { add_translator (trans, ly_symbol2scm (trans->class_name ())); }
 
 Translator *get_translator (SCM s);
 

@@ -130,7 +130,7 @@ Slur_engraver::listen_note (Stream_event *ev)
       Stream_event *art = unsmob<Stream_event> (scm_car (arts));
       if (art->in_event_class (event_symbol ()))
       // get instance
-        call_spanner_filtered<Event_info>
+        static_cast<Spanner_engraver<Slur_engraver> *> (manager_)->call_spanner_filtered<Event_info>
         (get_share_context (ev->get_property ("spanner-share-context")),
          ev->get_property ("spanner-id"),
          &Slur_engraver::listen_note_slur, Event_info (art, ev));

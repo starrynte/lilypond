@@ -117,6 +117,7 @@
  (lambda (x)
    (hash-set! name->engraver-table (ly:translator-name x) x))
  (ly:get-all-translators))
+(print (object->string (ly:get-all-translators)))
 
 (define (find-engraver-by-name name)
   "NAME is a symbol."

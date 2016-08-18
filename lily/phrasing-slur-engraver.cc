@@ -19,7 +19,7 @@
 
 #include "slur-engraver.hh"
 
-#include "translator.icc"
+#include "spanner-engraver.icc"
 
 class Phrasing_slur_engraver : public Slur_engraver
 {
@@ -30,8 +30,8 @@ class Phrasing_slur_engraver : public Slur_engraver
   virtual void set_melisma (bool);
 
 public:
-  TRANSLATOR_DECLARATIONS (Phrasing_slur_engraver);
-  TRANSLATOR_INHERIT (Slur_engraver);
+  SPANNER_ENGRAVER_INSTANCE_DECLARATIONS (Phrasing_slur_engraver);
+//  TRANSLATOR_INHERIT (Slur_engraver);
 };
 
 SCM
@@ -70,6 +70,7 @@ Phrasing_slur_engraver::set_melisma (bool)
 void
 Phrasing_slur_engraver::boot ()
 {
+/*
   ADD_SPANNER_LISTENER_FOR (Phrasing_slur_engraver, slur, phrasing_slur);
   ADD_SPANNER_LISTENER (Phrasing_slur_engraver, note);
   ADD_SPANNER_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, inline_accidental);
@@ -81,9 +82,10 @@ Phrasing_slur_engraver::boot ()
   ADD_SPANNER_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, text_script);
   ADD_SPANNER_END_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, tie);
   ADD_SPANNER_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, tuplet_number);
+*/
 }
 
-ADD_TRANSLATOR (Phrasing_slur_engraver,
+ADD_SPANNER_ENGRAVER (Phrasing_slur_engraver,
                 /* doc */
                 "Print phrasing slurs.  Similar to @ref{Slur_engraver}.",
 

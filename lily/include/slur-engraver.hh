@@ -25,7 +25,11 @@
 #include "spanner-engraver-instance.hh"
 #include <map>
 
-class Slur_engraver : public Spanner_engraver_instance
+class Slur_engraver : public Spanner_engraver<Slur_engraver>
+{
+  TRANSLATOR_DECLARATIONS (Slur_engraver);
+}
+class Spanner_engraver<Slur_engraver>::Instance
 {
 protected:
   struct Event_info {

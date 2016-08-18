@@ -44,7 +44,7 @@ LY_DEFINE (get_all_translators, "ly:get-all-translators", 0, 0, 0, (),
 }
 
 void
-add_translator (Translator *t)
+add_translator (Translator *t, SCM sym)
 {
   Scheme_hash_table *dict = unsmob<Scheme_hash_table> (global_translator_dict);
   if (!dict)
@@ -53,8 +53,8 @@ add_translator (Translator *t)
       dict = unsmob<Scheme_hash_table> (global_translator_dict);
     }
 
-  SCM k = ly_symbol2scm (t->class_name ());
-  dict->set (k, t->unprotect ());
+  debug_output ("add_translator " + ly_scm2string (scm_object_to_string (sym, SCM_UNDEFINED)));
+  dict->set (sym, t->unprotect ());
 }
 
 Translator *

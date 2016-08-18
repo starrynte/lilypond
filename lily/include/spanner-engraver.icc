@@ -3,9 +3,28 @@
 
 #include "engraver.hh"
 #include "spanner-engraver.hh"
+#include "translator.icc"
+
 
 #define ADD_SPANNER_ENGRAVER(classname, desc, grobs, read, write)        \
-  ADD_TRANSLATOR (Spanner_engraver<classname>, desc, grobs, read, write) \
+  /* from DEFINE_TRANSLATOR_DOC */ \
+  template <> \
+  SCM                                                                   \
+  Spanner_engraver<classname>::static_translator_description () const                     \
+  {                                                                     \
+    return Translator::static_translator_description (grobs, desc, listener_list_, read, write); \
+  } \
+  /* from ADD_THIS_TRANSLATOR */ \
+static void _ ## classname ## _adder () \
+{ \
+  Spanner_engraver<classname>::boot (); \
+  Spanner_engraver<classname> *t = new Spanner_engraver<classname>; \
+  Spanner_engraver<classname>::static_description_ \
+    = scm_permanent_object (t->static_translator_description ()); \
+  add_translator (t, ly_symbol2scm (#classname)); \
+} \
+  ADD_GLOBAL_CTOR_WITHNAME (classname, _ ## classname ## _adder); \
+  /* end define */
 
 #define ADD_SPANNER_ACKNOWLEDGER_FULL(CLASS, NAME, GROB, DIRECTION, FILTERED)        \
   add_acknowledger                                                                   \
@@ -39,7 +58,7 @@
 
 #define ADD_SPANNER_LISTENER_FULL(CLASS, NAME, EVENT, FILTERED)         \
   Spanner_engraver<CLASS>::listener_list_ = scm_acons                                            \
-    (event_class_symbol (#EVENT), Spanner_engraver<CLASS>::method_finder                              \
+    (Translator::event_class_symbol (#EVENT), Spanner_engraver<CLASS>::method_finder                              \
      <&Spanner_engraver<CLASS>::spanner_listen<&CLASS::listen_ ## NAME, FILTERED> > \
      (), Spanner_engraver<CLASS>::listener_list_)
 
