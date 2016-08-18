@@ -73,7 +73,7 @@ Phrasing_slur_engraver::set_melisma (bool)
 void
 Phrasing_slur_engraver::boot ()
 {
-  ADD_FILTERED_LISTENER_FOR (Phrasing_slur_engraver, Slur_engraver, slur, phrasing_slur);
+  ADD_FILTERED_LISTENER_FOR (Phrasing_slur_engraver, slur, phrasing_slur);
   ADD_LISTENER (Phrasing_slur_engraver, note);
   ADD_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, inline_accidental);
   ADD_ACKNOWLEDGER_FOR (Phrasing_slur_engraver, extra_object, fingering);

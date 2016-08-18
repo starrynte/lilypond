@@ -69,7 +69,7 @@ Slur_engraver::set_melisma (bool m)
 void
 Slur_engraver::boot ()
 {
-  ADD_FILTERED_LISTENER (Slur_engraver, Slur_engraver, slur);
+  ADD_FILTERED_LISTENER (Slur_engraver, slur);
   ADD_LISTENER (Slur_engraver, note);
   ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, inline_accidental);
   ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, fingering);
@@ -129,8 +129,9 @@ Slur_engraver::listen_note (Stream_event *ev)
     {
       Stream_event *art = unsmob<Stream_event> (scm_car (arts));
       if (art->in_event_class (event_symbol ()))
-        call_spanner_filtered<Slur_engraver, Event_info>
-        (ev->get_property ("spanner-id"),
+        call_spanner_filtered<Event_info>
+        (get_share_context (ev->get_property ("spanner-share-context")),
+         ev->get_property ("spanner-id"),
          &Slur_engraver::listen_note_slur, Event_info (art, ev));
     }
 }

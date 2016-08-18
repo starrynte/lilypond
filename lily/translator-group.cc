@@ -34,7 +34,6 @@
 #include "scheme-engraver.hh"
 #include "scm-hash.hh"
 #include "spanner.hh"
-#include "spanner-engraver.hh"
 #include "stream-event.hh"
 #include "warn.hh"
 

@@ -25,7 +25,7 @@
 #include "spanner-engraver.hh"
 #include <map>
 
-class Slur_engraver : public Spanner_engraver
+class Slur_engraver : public Spanner_engraver<Slur_engraver>
 {
 protected:
   struct Event_info {
@@ -75,7 +75,7 @@ protected:
 
 public:
   TRANSLATOR_DECLARATIONS (Slur_engraver);
-  TRANSLATOR_INHERIT (Spanner_engraver);
+  TRANSLATOR_INHERIT (Spanner_engraver<Slur_engraver>);
 };
 
 #endif // SLUR_ENGRAVER_HH
