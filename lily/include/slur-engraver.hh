@@ -22,39 +22,31 @@
 #define SLUR_ENGRAVER_HH
 
 #include "engraver.hh"
-#include "spanner-engraver.hh"
 #include <map>
 
-class Slur_engraver : public Spanner_engraver<Slur_engraver>
+class Slur_engraver : public Engraver
 {
 protected:
   struct Event_info {
     Stream_event *slur_, *note_;
-
-    Event_info ()
-      : slur_ (NULL), note_ (NULL)
-    { }
-
     Event_info (Stream_event *slur, Stream_event *note)
       : slur_ (slur), note_ (note)
     { }
-
-    Event_info (const Event_info& evi)
-      : slur_ (evi.slur_), note_ (evi.note_)
-    { }
   };
-  // TODO default initialize
-  Drul_array<Event_info> spanner_events_;
+  // protected so that subclasses can see them
+  vector<Event_info> start_events_;
+  vector<Event_info> stop_events_;
 
   typedef std::multimap<Stream_event *, Spanner *> Note_slurs;
   Drul_array<Note_slurs> note_slurs_;
-  Spanner *finished_spanner_;
+  vector<Grob *> slurs_;
+  vector<Grob *> end_slurs_;
   vector<Grob_info> objects_to_acknowledge_;
 
   virtual SCM event_symbol () const;
   virtual bool double_property () const;
   virtual SCM grob_symbol () const;
-  virtual const char *object_name () const;
+  virtual const char* object_name () const;
 
   void acknowledge_note_column (Grob_info);
   void acknowledge_script (Grob_info);
@@ -62,20 +54,22 @@ protected:
   void listen_note (Stream_event *ev);
   // A slur on an in-chord note is not actually announced as an event
   // but rather produced by the note listener.
-  void listen_note_slur (Event_info evi);
-  void listen_slur (Stream_event *ev) { listen_note_slur (Event_info (ev, 0)); }
+  void listen_note_slur (Stream_event *ev, Stream_event *note);
+  void listen_slur (Stream_event *ev) { listen_note_slur (ev, 0); }
   void acknowledge_extra_object (Grob_info);
   void stop_translation_timestep ();
   void process_music ();
 
-  void create_slur (Event_info evi, Direction dir);
+  bool can_create_slur (SCM, vsize, vsize *, Stream_event *);
+  void create_slur (SCM spanner_id, Event_info evi, Grob *g_cause, Direction dir, bool left_broken);
+  bool try_to_end (Event_info evi);
 
   virtual void set_melisma (bool);
+  virtual void finalize ();
   virtual void derived_mark () const;
 
 public:
   TRANSLATOR_DECLARATIONS (Slur_engraver);
-  TRANSLATOR_INHERIT (Spanner_engraver<Slur_engraver>);
 };
 
 #endif // SLUR_ENGRAVER_HH
