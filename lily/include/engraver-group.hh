@@ -52,6 +52,9 @@ public:
   bool pending_grobs () const;
 private:
   virtual void acknowledge_grobs ();
+
+  template <class T>
+  friend class Spanner_engraver;
 };
 
 typedef void (Engraver:: *Engraver_method) (void);

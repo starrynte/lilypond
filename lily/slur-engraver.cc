@@ -18,7 +18,9 @@
 */
 
 #include "context.hh"
+#include "direction.hh"
 #include "directional-element-interface.hh"
+#include "international.hh"
 #include "note-column.hh"
 #include "pointer-group-interface.hh"
 #include "slur-engraver.hh"
@@ -70,7 +72,7 @@ void
 Slur_engraver::boot ()
 {
   ADD_FILTERED_LISTENER (Slur_engraver, slur);
-  ADD_LISTENER (Slur_engraver, note);
+  ADD_SINGLE_LISTENER (Slur_engraver, note);
   ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, inline_accidental);
   ADD_ACKNOWLEDGER_FOR (Slur_engraver, extra_object, fingering);
   ADD_ACKNOWLEDGER (Slur_engraver, note_column);
@@ -113,17 +115,26 @@ Slur_engraver::derived_mark () const
 void
 Slur_engraver::listen_note_slur (Event_info evi)
 {
-  debug_output ("listennoteslur");
-  // TODO assign "once"
   Direction dir = to_dir (evi.slur_->get_property ("span-direction"));
+  if (dir == START && current_spanner_)
+    {
+      evi.slur_->origin ()->warning (_f ("already have %s", object_name ()));
+      return;
+    }
+
+  if (spanner_events_[dir].slur_)
+    {
+      // If the existing event has a direction, don't replace it
+      Direction updown = to_dir (spanner_events_[dir].slur_->get_property ("direction"));
+      if (updown)
+        return;
+    }
   spanner_events_[dir] = evi;
-  debug_output (spanner_events_[START].slur_ ? "listen START true" : "ic");
 }
 
 void
 Slur_engraver::listen_note (Stream_event *ev)
 {
-  debug_output ("listennote");
   for (SCM arts = ev->get_property ("articulations");
        scm_is_pair (arts); arts = scm_cdr (arts))
     {
@@ -181,6 +192,7 @@ Slur_engraver::acknowledge_script (Grob_info info)
 void
 Slur_engraver::create_slur (Event_info evi, Direction dir)
 {
+  debug_output ("creating slur: " + ly_scm2string (scm_object_to_string (evi.slur_->get_property ("spanner-id"), SCM_UNDEFINED)));
   Spanner *slur = make_multi_spanner (grob_symbol (), evi.slur_->self_scm (),
                                       evi.slur_->get_property ("spanner-share-context"),
                                       evi.slur_->get_property ("spanner-id"));
@@ -202,6 +214,7 @@ Slur_engraver::process_music ()
       Spanner *slur = get_shared_spanner (share, id);
       assert (slur);
 
+      finished_spanner_ = slur;
       end_spanner (slur, spanner_events_[STOP].slur_->self_scm ());
       if (spanner_events_[STOP].note_)
         note_slurs_[STOP].insert (Note_slurs::value_type (spanner_events_[STOP].note_, slur));
@@ -209,7 +222,6 @@ Slur_engraver::process_music ()
 
   if (spanner_events_[START].slur_)
     {
-      debug_output ("START pm");
       // TODO double slurs
       Direction dir = to_dir (spanner_events_[START].slur_->get_property ("direction"));
       create_slur (spanner_events_[START], dir);
@@ -245,6 +257,12 @@ Slur_engraver::stop_translation_timestep ()
 //                                              current_spanner_,
 //                                              finished_spanner_);
 
+  for (LEFT_and_RIGHT (d))
+    {
+      spanner_events_[d].slur_ = NULL;
+      spanner_events_[d].note_ = NULL;
+    }
+  finished_spanner_ = NULL;
   note_slurs_[LEFT].clear ();
   note_slurs_[RIGHT].clear ();
   objects_to_acknowledge_.clear ();
