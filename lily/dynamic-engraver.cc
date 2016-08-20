@@ -42,7 +42,6 @@ class Dynamic_engraver : public Spanner_engraver
 protected:
   virtual void process_music ();
   virtual void stop_translation_timestep ();
-  virtual void finalize ();
 
 private:
   SCM get_property_setting (Stream_event *evt, char const *evprop,
@@ -145,9 +144,9 @@ Dynamic_engraver::process_music ()
         {
           current_spanner_
             = make_multi_spanner ("DynamicTextSpanner",
-                                  accepted_spanevents_drul_[START]->self_scm (),
-                                  accepted_spanevents_drul_[START]->get_property ("spanner-share-context"),
-                                  accepted_spanevents_drul_[START]->get_property ("spanner-id"));
+                                  current_span_event_->self_scm (),
+                                  current_span_event_->get_property ("spanner-share-context"),
+                                  current_span_event_->get_property ("spanner-id"));
 
           SCM text = get_property_setting (current_span_event_, "span-text",
                                            (start_type + "Text").c_str ());
@@ -172,10 +171,13 @@ Dynamic_engraver::process_music ()
             }
           current_spanner_
             = make_multi_spanner ("Hairpin",
-                                  accepted_spanevents_drul_[START]->self_scm (),
-                                  accepted_spanevents_drul_[START]->get_property ("spanner-share-context"),
-                                  accepted_spanevents_drul_[START]->get_property ("spanner-id"));
+                                  current_span_event_->self_scm (),
+                                  current_span_event_->get_property ("spanner-share-context"),
+                                  current_span_event_->get_property ("spanner-id"));
         }
+      current_spanner_
+        ->set_property ("warn-unterminated",
+                        ly_symbol2scm (get_spanner_type (current_span_event_).c_str ()));
       // if we have a break-dynamic-span event right after the start dynamic, break the new spanner immediately
       if (end_new_spanner_)
         {
@@ -227,23 +229,6 @@ Dynamic_engraver::stop_translation_timestep ()
   accepted_spanevents_drul_.set (0, 0);
   finished_spanner_ = 0;
   end_new_spanner_ = false;
-}
-
-void
-Dynamic_engraver::finalize ()
-{
-  if (current_spanner_
-      && !current_spanner_->is_live ())
-    current_spanner_ = 0;
-  if (current_spanner_)
-    {
-      current_span_event_
-      ->origin ()->warning (_f ("unterminated %s",
-                                get_spanner_type (current_span_event_)
-                                .c_str ()));
-      current_spanner_->suicide ();
-      current_spanner_ = 0;
-    }
 }
 
 string

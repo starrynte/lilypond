@@ -98,8 +98,14 @@ Translator_group::finalize ()
           Spanner *span = unsmob<Spanner> (scm_car (spanner_list));
           if (span->is_live ())
             {
-              if (!scm_is_false (span->get_property ("warn-unterminated")))
-                span->warning (_f ("unterminated %s", span->name ()));
+              SCM warn_unterminated = span->get_property ("warn-unterminated");
+              if (!scm_is_false (warn_unterminated))
+                {
+                  string name = scm_is_symbol (warn_unterminated)
+                                ? ly_symbol2string (warn_unterminated)
+                                : span->name ();
+                  span->warning (_f ("unterminated %s", name));
+                }
               span->suicide ();
             }
           spanner_list = scm_cdr (spanner_list);
