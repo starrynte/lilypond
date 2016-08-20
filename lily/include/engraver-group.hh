@@ -53,7 +53,6 @@ public:
 private:
   virtual void acknowledge_grobs ();
 
-  template <class T>
   friend class Spanner_engraver;
 };
 

@@ -993,6 +993,8 @@ override:
   #'spacing-pair = #'(staff-bar . staff-bar)
 @end example")
      (spanner-id ,key? "An identifier to distinguish concurrent spanners.")
+     (spanner-share-context ,symbol? "Context within which this object
+may exist.")
      (springs-and-rods ,boolean? "Dummy variable for triggering
 spacing routines.")
      (stacking-dir ,ly:dir? "Stack objects in which direction?")
@@ -1147,6 +1149,8 @@ one below this grob.")
 ;;;
 ;;; w
 ;;;
+     (warn-unterminated ,boolean? "If false, no warning is issued if this
+spanner is unterminated")
      (when ,ly:moment? "Global time step associated with this column.")
      (whiteout ,boolean-or-number? "If a number or true, the grob is
 printed over a white background to white-out underlying material, if

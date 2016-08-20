@@ -32,7 +32,7 @@
 #include "translator.icc"
 #include <sstream>
 
-class Dynamic_engraver : public Spanner_engraver<Dynamic_engraver>
+class Dynamic_engraver : public Spanner_engraver
 {
   TRANSLATOR_DECLARATIONS (Dynamic_engraver);
   void acknowledge_note_column (Grob_info);
@@ -206,7 +206,6 @@ Dynamic_engraver::process_music ()
 
   if (script_event_)
     {
-      // TODO make_multi_item?
       script_ = make_item ("DynamicText", script_event_->self_scm ());
       script_->set_property ("text",
                              script_event_->get_property ("text"));

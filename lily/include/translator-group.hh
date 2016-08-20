@@ -64,7 +64,6 @@ protected:
   Context *context_;
 
   friend class Context_def;
-  template <class T>
   friend class Spanner_engraver;
   virtual void derived_mark () const;
 };

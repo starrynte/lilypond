@@ -2,12 +2,14 @@
 #define SPANNER_ENGRAVER_HH
 
 #include "context.hh"
+#include "direction.hh"
 #include "engraver.hh"
 #include "engraver-group.hh"
 #include "spanner.hh"
 #include "std-string.hh"
 #include "std-vector.hh"
 #include "stream-event.hh"
+#include "translator-dispatch-list.hh"
 #include "translator-group.hh"
 #include <sstream>
 #include <utility>
@@ -26,41 +28,45 @@
 // The current voice a spanner belongs to is stored in the spanner property
 // current-engraver.
 
-template <class T>
 class Spanner_engraver : public Engraver
 {
 public:
   Spanner_engraver ();
 
 private:
+  // This instance will only listen/acknowledge for this share context and spanner id
   Context *filter_share_;
   SCM filter_id_;
   // The initial engraver in each voice is responsible for creating other instances
   bool is_manager_;
 
 protected:
-  DECLARE_TRANSLATOR_CALLBACKS (Spanner_engraver);
-
   virtual void initialize ();
 
-  template <void (T::*callback) (Grob_info)>
+  // Filtered listen/acknowledge callbacks are first passed through these functions
+  template <class T, void (T::*callback) (Grob_info)>
   void spanner_acknowledge (Grob_info info);
 
-  template <void (T::*callback) (Stream_event *)>
+  template <class T, void (T::*callback) (Stream_event *)>
   void spanner_listen (Stream_event *ev);
 
-  template <void (T::*callback) (Stream_event *)>
+  template <class T, void (T::*callback) (Stream_event *)>
   void spanner_single_listen (Stream_event *ev);
 
-  template <class ParameterType>
+  // Call a function on a particular instance (with some share context and spanner id)
+  template <class T, class ParameterType>
   void call_spanner_filtered (SCM share_context, SCM spanner_id,
                               void (T::*callback) (ParameterType), ParameterType argument);
 
+  // Create a new instance for this share context and spanner id
+  // If an instance already exists for that combination, only create another one
+  // if multiple is true
+  template <class T>
   T *create_instance (SCM share_context, SCM spanner_id, bool multiple = true);
 
 protected:
-  // When a spanner changes voices, this needs to be set to NULL
-  // in the engraver originally containing the spanner
+  // When a spanner changes voices, this needs to be set to NULL in the
+  // engraver originally containing the spanner (see take_spanner)
   Spanner *current_spanner_;
 
   #define make_multi_spanner(x, cause, share, id)                     \
@@ -69,9 +75,11 @@ protected:
   Spanner *internal_make_multi_spanner (SCM x, SCM cause, SCM share, SCM id,
                                         char const *file, int line, char const *fun);
 
-  Spanner_engraver<T> *take_spanner (SCM share_context, SCM id);
+  // Get the spanner with some share context and id, and move it to this context
+  Spanner_engraver *take_spanner (SCM share_context, SCM id);
 
-  void end_spanner (Spanner *span, SCM cause, bool announce = true);
+  // If cause is SCM_EOL, don't announce
+  void end_spanner (Spanner *span, SCM cause);
 
 protected:
   Context *get_share_context (SCM s);
@@ -80,7 +88,6 @@ protected:
   // If spanner-list has more than one spanner, the first function warns
   // and returns the first spanner
   Spanner *get_shared_spanner (Context *share, SCM spanner_id);
-
   vector<Spanner *> get_shared_spanners (Context *share, SCM spanner_id);
 
   // Delete spanner(s) from share's sharedSpanners property
@@ -94,36 +101,9 @@ private:
   { return scm_cons (ly_symbol2scm (class_name ()), spanner_id); }
 };
 
-template <class T>
-Spanner_engraver<T>::Spanner_engraver ()
-  : filter_share_ (NULL), filter_id_ (SCM_EOL), is_manager_ (true), current_spanner_ (NULL)
-{
-}
-
-template <class T>
-void Spanner_engraver<T>::initialize ()
-{
-  debug_output (string ("initializing se for ") + class_name () + ", is_manager? " + (is_manager_ ? "TRUE" : "FALSE"));
-  if (is_manager_)
-    {
-      // Can't set this in constructor
-      filter_share_ = context ();
-
-      SCM key = scm_vector (scm_list_3 (ly_symbol2scm (class_name ()), filter_share_->self_scm (), filter_id_));
-      SCM spanner_engravers = context ()->get_property ("spannerEngravers");
-      SCM instances = scm_assoc_ref (spanner_engravers, key);
-      instances = scm_is_pair (instances)
-                  ? scm_cons (self_scm (), instances)
-                  : scm_list_1 (self_scm ());
-      context ()->set_property ("spannerEngravers",
-                                scm_assoc_set_x (spanner_engravers, key, instances));
-    }
-}
-
-template <class T>
-template <void (T::*callback) (Grob_info)>
+template <class T, void (T::*callback) (Grob_info)>
 void
-Spanner_engraver<T>::spanner_acknowledge (Grob_info info)
+Spanner_engraver::spanner_acknowledge (Grob_info info)
 {
   debug_output ("spanner_ack");
   Grob *grob = info.grob ();
@@ -137,7 +117,7 @@ Spanner_engraver<T>::spanner_acknowledge (Grob_info info)
 
   if (is_manager_)
     {
-      T *instance = create_instance (share_context, id, false);
+      T *instance = create_instance<T> (share_context, id, false);
       if (instance)
         {
           (instance->*callback) (info);
@@ -149,10 +129,9 @@ Spanner_engraver<T>::spanner_acknowledge (Grob_info info)
     (static_cast<T *> (this)->*callback) (info);
 }
 
-template <class T>
-template <void (T::*callback) (Stream_event *)>
+template <class T, void (T::*callback) (Stream_event *)>
 void
-Spanner_engraver<T>::spanner_listen (Stream_event *ev)
+Spanner_engraver::spanner_listen (Stream_event *ev)
 {
   debug_output (class_name () + string (" spanner_listen"));
   SCM id = ev->get_property ("spanner-id");
@@ -163,7 +142,7 @@ Spanner_engraver<T>::spanner_listen (Stream_event *ev)
 
   if (is_manager_)
     {
-      T *instance = create_instance (share_context, id, false);
+      T *instance = create_instance<T> (share_context, id, false);
       if (instance)
         {
           (instance->*callback) (ev);
@@ -175,30 +154,30 @@ Spanner_engraver<T>::spanner_listen (Stream_event *ev)
     (static_cast<T *> (this)->*callback) (ev);
 }
 
-template <class T>
-template <void (T::*callback) (Stream_event *)>
+template <class T, void (T::*callback) (Stream_event *)>
 void
-Spanner_engraver<T>::spanner_single_listen (Stream_event *ev)
+Spanner_engraver::spanner_single_listen (Stream_event *ev)
 {
   debug_output (class_name () + string (" spanner_single_listen"));
   if (is_manager_)
     (static_cast<T *> (this)->*callback) (ev);
 }
 
-template <class T>
-template <class ParameterType>
+template <class T, class ParameterType>
 void
-Spanner_engraver<T>::call_spanner_filtered (SCM share_context, SCM spanner_id,
+Spanner_engraver::call_spanner_filtered (SCM share_context, SCM spanner_id,
                                          void (T::*callback)(ParameterType), ParameterType argument)
 {
-  T *instance = create_instance (share_context, spanner_id, false);
+  T *instance = create_instance<T> (share_context, spanner_id, false);
   if (instance)
     {
       (instance->*callback) (argument);
       return;
     }
 
-  SCM key = scm_vector (scm_list_3 (ly_symbol2scm (class_name ()), get_share_context (share_context)->self_scm (), spanner_id));
+  SCM key = scm_vector (scm_list_3 (ly_symbol2scm (class_name ()),
+                                    get_share_context (share_context)->self_scm (),
+                                    spanner_id));
   SCM instances = scm_assoc_ref (context ()->get_property ("spannerEngravers"), key);
   while (scm_is_pair (instances))
     {
@@ -211,7 +190,7 @@ Spanner_engraver<T>::call_spanner_filtered (SCM share_context, SCM spanner_id,
 
 template <class T>
 T *
-Spanner_engraver<T>::create_instance (SCM share_context, SCM id, bool multiple)
+Spanner_engraver::create_instance (SCM share_context, SCM id, bool multiple)
 {
   Context *share = get_share_context (share_context);
   SCM key = scm_vector (scm_list_3 (ly_symbol2scm (class_name ()), share->self_scm (), id));
@@ -232,15 +211,41 @@ Spanner_engraver<T>::create_instance (SCM share_context, SCM id, bool multiple)
   instance->connect_to_context (daddy_context_);
 
   SCM instance_scm = instance->self_scm ();
+
+  // Add to Translator_group::precomputed_method_bindings
   Translator_group *group = get_daddy_translator ();
   group->simple_trans_list_ = scm_cons (instance_scm, group->simple_trans_list_);
-  // TODO can speed up
+  SCM ptrs[TRANSLATOR_METHOD_PRECOMPUTE_COUNT];
+  fetch_precomputable_methods (ptrs);
   for (vsize i = 0; i < TRANSLATOR_METHOD_PRECOMPUTE_COUNT; i++)
-    group->precomputed_method_bindings_[i].clear ();
-  group->precompute_method_bindings ();
+    {
+      if (!SCM_UNBNDP (ptrs[i]))
+        group->precomputed_method_bindings_[i].push_back (Method_instance (ptrs[i], instance));
+    }
+
+  // Add to Engraver_group::acknowledge_hash_table_drul
   Engraver_group *egroup = static_cast<Engraver_group *> (group);
-  egroup->acknowledge_hash_table_drul_[LEFT] = scm_c_make_hash_table (61);
-  egroup->acknowledge_hash_table_drul_[RIGHT] = scm_c_make_hash_table (61);
+  for (LEFT_and_RIGHT (d))
+    {
+      Scheme_hash_table *table = unsmob<Scheme_hash_table> (T::acknowledge_static_array_drul_[d]);
+      // Skip if there are no acknowledgers in this direction
+      if (!table)
+        continue;
+      SCM interfaces = table->to_alist ();
+      while (scm_is_pair (interfaces))
+        {
+          SCM name = scm_caar (interfaces);
+          SCM ptr = scm_cdar (interfaces);
+          SCM acklist_scm = scm_hashq_ref (egroup->acknowledge_hash_table_drul_[d], name, SCM_BOOL_F);
+          if (!scm_is_false (acklist_scm))
+            {
+              Engraver_dispatch_list *acklist = unsmob<Engraver_dispatch_list> (acklist_scm);
+              acklist->dispatch_entries_.push_back (Method_instance (ptr, this));
+            }
+
+          interfaces = scm_cdr (interfaces);
+        }
+    }
 
   instances = scm_is_pair (instances)
     ? scm_cons (instance_scm, instances)
@@ -250,146 +255,19 @@ Spanner_engraver<T>::create_instance (SCM share_context, SCM id, bool multiple)
   return instance;
 }
 
-template <class T>
-Spanner *
-Spanner_engraver<T>::internal_make_multi_spanner (SCM x, SCM cause, SCM share, SCM id,
-                                      char const *file, int line, char const *fun)
-{
-  Spanner *span = internal_make_spanner (x, cause, file, line, fun);
-  span->set_property ("spanner-id", id);
-  span->set_property ("spanner-share-context", share);
-  span->set_property ("current-engraver", self_scm ());
-
-  current_spanner_ = span;
-
-  add_shared_spanner (get_share_context (share), id, span);
-  return span;
-}
-
-template <class T>
-Spanner_engraver<T> *
-Spanner_engraver<T>::take_spanner (SCM share_context, SCM id)
-{
-  debug_output ("take spanner");
-  Spanner *span = get_shared_spanner (get_share_context (share_context), id);
-  if (!span)
-    {
-      debug_output ("DNE");
-      current_spanner_ = NULL;
-      return NULL;
-    }
-
-  Spanner_engraver<T> *owner
-    = unsmob<Spanner_engraver<T> > (span->get_property ("current-engraver"));
-  owner->current_spanner_ = NULL;
-  current_spanner_ = span;
-  span->set_property ("current-engraver", self_scm ());
-
-  return owner;
-}
-
-template <class T>
-void
-// TODO maybe can just check cause to see if need to announce
-Spanner_engraver<T>::end_spanner (Spanner *span, SCM cause, bool announce)
-{
-  if (announce)
-    announce_end_grob (span, cause);
-
-  SCM id = span->get_property ("spanner-id");
-  Context *share = get_share_context (span->get_property ("spanner-share-context"));
-  // TODO may be called multiple times: need to check?
-  delete_shared_spanner (share, id);
-}
-
-template <class T>
-Context *
-Spanner_engraver<T>::get_share_context (SCM s)
-{
-  Context *share = find_context_above (context (), s);
-  return (share == NULL) ? context () : share;
-}
-
-template <class T>
-Spanner *
-Spanner_engraver<T>::get_shared_spanner (Context *share, SCM spanner_id)
-{
-  SCM shared_spanners;
-  if (!share->here_defined (ly_symbol2scm ("sharedSpanners"), &shared_spanners))
-    return NULL;
-
-  SCM spanner_list = scm_assoc_ref (shared_spanners, key (spanner_id));
-  if (scm_is_false (spanner_list) || !scm_is_pair (spanner_list))
-    return NULL;
-
-  if (scm_is_pair (scm_cdr (spanner_list)))
-    warning ("Requested one spanner when multiple present");
-
-  return unsmob<Spanner> (scm_car (spanner_list));
-}
-
-template <class T>
-vector<Spanner *>
-Spanner_engraver<T>::get_shared_spanners (Context *share, SCM spanner_id)
-{
-  vector<Spanner *> spanners;
-  SCM shared_spanners;
-  if (share->here_defined (ly_symbol2scm ("sharedSpanners"), &shared_spanners))
-    {
-      SCM spanner_list = scm_assoc_ref (shared_spanners, key (spanner_id));
-      while (scm_is_pair (spanner_list))
-        {
-          spanners.push_back (unsmob<Spanner> (scm_car (spanner_list)));
-          spanner_list = scm_cdr (spanner_list);
-        }
-    }
-
-  return spanners;
-}
-
-template <class T>
-void
-Spanner_engraver<T>::delete_shared_spanner (Context *share, SCM spanner_id)
-{
-  SCM shared_spanners;
-  if (share->here_defined (ly_symbol2scm ("sharedSpanners"), &shared_spanners))
-    share->set_property ("sharedSpanners",
-                         scm_assoc_remove_x (shared_spanners, key (spanner_id)));
-}
-
-template <class T>
-void
-Spanner_engraver<T>::add_shared_spanner (Context *share, SCM spanner_id, Spanner *span)
-{
-  SCM shared_spanners;
-  if (!share->here_defined (ly_symbol2scm ("sharedSpanners"), &shared_spanners))
-    shared_spanners = SCM_EOL;
-
-  SCM spanner_list = scm_assoc_ref (shared_spanners, key (spanner_id));
-  spanner_list = scm_is_false (spanner_list)
-                 ? scm_list_1 (span->self_scm ())              // Create new list
-                 : scm_cons (span->self_scm (), spanner_list); // Add spanner to existing list
-
-  share->set_property ("sharedSpanners",
-                       scm_assoc_set_x (shared_spanners,
-                                        key (spanner_id), spanner_list));
-}
-
-
-
-
-
 // Based on definitions in translator.icc
 // Filtered callbacks are sent to each child instance, but first redirected
 // through spanner_acknowledge/spanner_listen. If the id and share context
 // match, the callback is then called on the child instance.
-// TODO make custom trampoline that checks
 // TODO add option to filter out grobs from sibling engraver instances
-#define ADD_FILTERED_ACKNOWLEDGER_FULL(CLASS, NAME, GROB, DIRECTION)       \
-  add_acknowledger                                                         \
-  (Callback2_wrapper::make_smob<trampoline<Spanner_engraver,                                                           \
-   &Spanner_engraver::spanner_acknowledge<&CLASS::acknowledge_ ## NAME> > > \
-   (), #GROB, acknowledge_static_array_drul_[DIRECTION])
+// TODO need to handle listeners/acknowledgers with inheritance
+// TODO should take_spanner be automatically called for filtered listener/acknowledgers?
+#define ADD_FILTERED_ACKNOWLEDGER_FULL(CLASS, NAME, GROB, DIRECTION)                               \
+  add_acknowledger                                                                                 \
+  (Callback2_wrapper::make_smob                                                                    \
+   <trampoline<Spanner_engraver,                                                                   \
+               &Spanner_engraver::spanner_acknowledge<CLASS, &CLASS::acknowledge_ ## NAME> > > (), \
+   #GROB, acknowledge_static_array_drul_[DIRECTION])
 
 #define ADD_FILTERED_ACKNOWLEDGER(CLASS, NAME) \
   ADD_FILTERED_ACKNOWLEDGER_FULL (CLASS, NAME, NAME, START)
@@ -403,20 +281,23 @@ Spanner_engraver<T>::add_shared_spanner (Context *share, SCM spanner_id, Spanner
 #define ADD_FILTERED_END_ACKNOWLEDGER_FOR(CLASS, NAME, GROB) \
   ADD_FILTERED_ACKNOWLEDGER_FULL (CLASS, NAME, GROB, STOP)
 
-#define ADD_FILTERED_LISTENER_FOR(CLASS, NAME, EVENT)         \
-  listener_list_ = scm_acons                                            \
-    (event_class_symbol (#EVENT), \
-     Callback_wrapper::make_smob<trampoline<Spanner_engraver, \
-     &Spanner_engraver::spanner_listen<&CLASS::listen_ ## NAME> > > \
-     (), listener_list_)
+#define ADD_FILTERED_LISTENER_FOR(CLASS, NAME, EVENT)                                      \
+  listener_list_ = scm_acons                                                               \
+    (event_class_symbol (#EVENT),                                                          \
+     Callback_wrapper::make_smob                                                           \
+     <trampoline<Spanner_engraver,                                                         \
+                 &Spanner_engraver::spanner_listen<CLASS, &CLASS::listen_ ## NAME> > > (), \
+     listener_list_)
 
 #define ADD_FILTERED_LISTENER(CLASS, NAME) \
   ADD_FILTERED_LISTENER_FOR (CLASS, NAME, NAME)
 
-#define ADD_SINGLE_LISTENER(CLASS, NAME) \
-  listener_list_ = scm_acons                                            \
-    (event_class_symbol (#NAME), method_finder                              \
-     <&Spanner_engraver::spanner_single_listen<&CLASS::listen_ ## NAME> > \
-     (), listener_list_)
+#define ADD_SINGLE_LISTENER(CLASS, NAME)                                                          \
+  listener_list_ = scm_acons                                                                      \
+    (event_class_symbol (#NAME),                                                                  \
+     Callback_wrapper::make_smob                                                                  \
+     <trampoline<Spanner_engraver,                                                                \
+                 &Spanner_engraver::spanner_single_listen<CLASS, &CLASS::listen_ ## NAME> > > (), \
+     listener_list_)
 
 #endif // SPANNER_ENGRAVER_HH

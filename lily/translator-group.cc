@@ -98,7 +98,8 @@ Translator_group::finalize ()
           Spanner *span = unsmob<Spanner> (scm_car (spanner_list));
           if (span->is_live ())
             {
-              span->warning (_f ("unterminated %s", span->name ()));
+              if (!scm_is_false (span->get_property ("warn-unterminated")))
+                span->warning (_f ("unterminated %s", span->name ()));
               span->suicide ();
             }
           spanner_list = scm_cdr (spanner_list);
@@ -326,9 +327,7 @@ Translator_group::precompute_method_bindings ()
       for (int i = 0; i < TRANSLATOR_METHOD_PRECOMPUTE_COUNT; i++)
         {
           if (!SCM_UNBNDP (ptrs[i]))
-//            { debug_output (string ("adding binding for ") + tr->class_name ());
             precomputed_method_bindings_[i].push_back (Method_instance (ptrs[i], tr));
-//            } else debug_output (string ("skipping binding for ") + tr->class_name ());
         }
     }
 

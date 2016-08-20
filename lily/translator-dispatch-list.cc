@@ -32,7 +32,6 @@ Engraver_dispatch_list::apply (Grob_info gi)
       if (scm_is_eq (e.instance (), origin))
         continue;
 
-//      debug_output ("calling on " + ly_scm2string (scm_object_to_string (e.instance (), SCM_UNDEFINED)));
       e (grob, origin);
     }
 }
