@@ -5,13 +5,11 @@
 #include "direction.hh"
 #include "engraver.hh"
 #include "engraver-group.hh"
-#include "spanner.hh"
 #include "std-string.hh"
 #include "std-vector.hh"
 #include "stream-event.hh"
 #include "translator-dispatch-list.hh"
 #include "translator-group.hh"
-#include <sstream>
 #include <utility>
 
 // Context property spannerEngravers is an alist:
@@ -105,15 +103,10 @@ template <class T, void (T::*callback) (Grob_info)>
 void
 Spanner_engraver::spanner_acknowledge (Grob_info info)
 {
-  debug_output ("spanner_ack");
   Grob *grob = info.grob ();
   SCM id = grob->get_property ("spanner-id");
   SCM share_context = grob->get_property ("spanner-share-context");
   Context *share = get_share_context (share_context);
-  debug_output (ly_scm2string (scm_object_to_string (id, SCM_UNDEFINED)));
-  debug_output ("self " + ly_scm2string (scm_object_to_string (filter_id_, SCM_UNDEFINED)));
-  debug_output (ly_scm2string (scm_object_to_string (context ()->get_property ("sharedSpanners"), SCM_UNDEFINED)));
-  debug_output (ly_scm2string (scm_object_to_string (context ()->get_property ("spannerEngravers"), SCM_UNDEFINED)));
 
   if (is_manager_)
     {
@@ -133,12 +126,9 @@ template <class T, void (T::*callback) (Stream_event *)>
 void
 Spanner_engraver::spanner_listen (Stream_event *ev)
 {
-  debug_output (class_name () + string (" spanner_listen"));
   SCM id = ev->get_property ("spanner-id");
   SCM share_context = ev->get_property ("spanner-share-context");
   Context *share = get_share_context (share_context);
-  debug_output (ly_scm2string (scm_object_to_string (id, SCM_UNDEFINED)));
-  debug_output ("self " + ly_scm2string (scm_object_to_string (filter_id_, SCM_UNDEFINED)));
 
   if (is_manager_)
     {
@@ -158,7 +148,6 @@ template <class T, void (T::*callback) (Stream_event *)>
 void
 Spanner_engraver::spanner_single_listen (Stream_event *ev)
 {
-  debug_output (class_name () + string (" spanner_single_listen"));
   if (is_manager_)
     (static_cast<T *> (this)->*callback) (ev);
 }
@@ -196,7 +185,6 @@ Spanner_engraver::create_instance (SCM share_context, SCM id, bool multiple)
   SCM key = scm_vector (scm_list_3 (ly_symbol2scm (class_name ()), share->self_scm (), id));
   SCM spanner_engravers = context ()->get_property ("spannerEngravers");
   SCM instances = scm_assoc_ref (spanner_engravers, key);
-  debug_output (ly_scm2string (scm_object_to_string (instances, SCM_UNDEFINED)));
   if (!multiple && scm_is_pair (instances))
     return NULL;
 

@@ -1,3 +1,5 @@
+#include "context.hh"
+#include "spanner.hh"
 #include "spanner-engraver.hh"
 
 Spanner_engraver::Spanner_engraver ()
@@ -7,7 +9,6 @@ Spanner_engraver::Spanner_engraver ()
 
 void Spanner_engraver::initialize ()
 {
-  debug_output (string ("initializing se for ") + class_name () + ", is_manager? " + (is_manager_ ? "TRUE" : "FALSE"));
   if (is_manager_)
     {
       // Can't set this in constructor
@@ -43,11 +44,9 @@ Spanner_engraver::internal_make_multi_spanner (SCM x, SCM cause, SCM share, SCM 
 Spanner_engraver *
 Spanner_engraver::take_spanner (SCM share_context, SCM id)
 {
-  debug_output ("take spanner");
   Spanner *span = get_shared_spanner (get_share_context (share_context), id);
   if (!span)
     {
-      debug_output ("DNE");
       current_spanner_ = NULL;
       return NULL;
     }

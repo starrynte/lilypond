@@ -338,10 +338,7 @@ Translator_group::precomputed_translator_foreach (Translator_precompute_index id
 {
   vector<Method_instance> &bindings (precomputed_method_bindings_[idx]);
   for (vsize i = 0; i < bindings.size (); i++)
-    {
-//    debug_output (string ("calling binding for ") + unsmob<Translator> (bindings[i].instance ())->class_name ());
     bindings[i]();
-    }
 }
 
 Translator_group::~Translator_group ()

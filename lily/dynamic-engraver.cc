@@ -30,7 +30,6 @@
 #include "text-interface.hh"
 
 #include "translator.icc"
-#include <sstream>
 
 class Dynamic_engraver : public Spanner_engraver
 {
@@ -87,11 +86,11 @@ Dynamic_engraver::listen_span_dynamic (Stream_event *ev)
 }
 
 void
-Dynamic_engraver::listen_break_span (Stream_event *ev)
+Dynamic_engraver::listen_break_span (Stream_event *event)
 {
-  if (ev->in_event_class ("break-dynamic-span-event"))
+  if (event->in_event_class ("break-dynamic-span-event"))
     {
-      take_spanner (ev->get_property ("spanner-share-context"), ev->get_property ("spanner-id"));
+      take_spanner (event->get_property ("spanner-share-context"), event->get_property ("spanner-id"));
       // Case 1: Already have a start dynamic event -> break applies to new
       //         spanner (created later) -> set a flag
       // Case 2: no new spanner, but spanner already active -> break it now
@@ -116,10 +115,6 @@ Dynamic_engraver::get_property_setting (Stream_event *evt,
 void
 Dynamic_engraver::process_music ()
 {
-  debug_output (string ("current span? ") + (current_spanner_ ? "YES" : "NO"));
-  debug_output (string ("start event? ") + (accepted_spanevents_drul_[START] ? "YES" : "NO"));
-  debug_output (string ("stop event? ") + (accepted_spanevents_drul_[STOP] ? "YES" : "NO"));
-  debug_output (string ("script event? ") + (script_event_ ? "YES" : "NO"));
   if (current_spanner_
       && (accepted_spanevents_drul_[STOP]
           || script_event_
@@ -132,7 +127,6 @@ Dynamic_engraver::process_music ()
       if (!ender)
         ender = accepted_spanevents_drul_[START];
 
-      take_spanner (ender->get_property ("spanner-share-context"), ender->get_property ("spanner-id"));
       finished_spanner_ = current_spanner_;
       end_spanner (current_spanner_, ender->self_scm ());
       current_spanner_ = 0;
@@ -181,9 +175,6 @@ Dynamic_engraver::process_music ()
                                   accepted_spanevents_drul_[START]->self_scm (),
                                   accepted_spanevents_drul_[START]->get_property ("spanner-share-context"),
                                   accepted_spanevents_drul_[START]->get_property ("spanner-id"));
-          ostringstream oss;
-          oss << "made new spanner " << current_spanner_;
-          debug_output (oss.str ());
         }
       // if we have a break-dynamic-span event right after the start dynamic, break the new spanner immediately
       if (end_new_spanner_)

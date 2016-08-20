@@ -31,7 +31,6 @@
 #include "stream-event.hh"
 
 #include "translator.icc"
-#include <sstream>
 
 class Dynamic_align_engraver : public Spanner_engraver
 {
@@ -83,7 +82,6 @@ Dynamic_align_engraver::create_line_spanner (Grob *cause)
 void
 Dynamic_align_engraver::acknowledge_end_dynamic (Grob_info info)
 {
-  debug_output ("ack_end");
   assert (has_interface<Spanner> (info.grob ()));
   take_spanner (info.grob ());
 
@@ -98,7 +96,6 @@ Dynamic_align_engraver::acknowledge_end_dynamic (Grob_info info)
   if (!current_spanner_)
     return;
 
-  debug_output (current_dynamic_spanner_ ? "cds wao" : "D:<");
   if (current_dynamic_spanner_ == dynamic)
     {
       /* If the break flag is set, store the current spanner and let new dynamics
@@ -109,7 +106,6 @@ Dynamic_align_engraver::acknowledge_end_dynamic (Grob_info info)
           if (ended_line_)
             programming_error ("already have a force-ended DynamicLineSpanner.");
           ended_line_ = current_spanner_;
-          debug_output ("break");
           end_spanner (current_spanner_, SCM_EOL);
           current_spanner_ = 0;
         }
@@ -143,7 +139,6 @@ Dynamic_align_engraver::acknowledge_stem (Grob_info info)
 void
 Dynamic_align_engraver::acknowledge_dynamic (Grob_info info)
 {
-  debug_output ("ack_dyn");
   Grob *dynamic = info.grob ();
   take_spanner (dynamic);
 
@@ -160,7 +155,6 @@ Dynamic_align_engraver::acknowledge_dynamic (Grob_info info)
         {
           if (!ended_line_)
             ended_line_ = current_spanner_;
-          debug_output ("dir break");
           end_spanner (current_spanner_, SCM_EOL);
           current_spanner_ = 0;
           current_dynamic_spanner_ = 0;
@@ -172,9 +166,6 @@ Dynamic_align_engraver::acknowledge_dynamic (Grob_info info)
     {
       assert (!started_);
       started_ = info.spanner ();
-      ostringstream oss;
-      oss << "setting started " << this;
-      debug_output (oss.str ());
       current_dynamic_spanner_ = info.spanner ();
     }
   else if (info.item ())
@@ -201,7 +192,6 @@ Dynamic_align_engraver::take_spanner (Grob *dynamic)
     = static_cast<Dynamic_align_engraver *> (Spanner_engraver::take_spanner (dynamic->get_property ("spanner-share-context"), dynamic->get_property ("spanner-id")));
   if (owner && owner != this)
     {
-      // TODO check
       current_dynamic_spanner_ = owner->current_dynamic_spanner_;
       owner->current_dynamic_spanner_ = 0;
       ended_ = owner->ended_;
@@ -244,7 +234,6 @@ Dynamic_align_engraver::set_spanner_bounds (Spanner *line, bool end)
 void
 Dynamic_align_engraver::stop_translation_timestep ()
 {
-  debug_output ("stop timestep");
   bool end = current_spanner_ && !current_dynamic_spanner_;
 
   // Set the proper bounds for the current spanner and for a spanner that
@@ -261,7 +250,6 @@ Dynamic_align_engraver::stop_translation_timestep ()
 
   if (end)
     {
-      debug_output ("end = true");
       end_spanner (current_spanner_, SCM_EOL);
       current_spanner_ = 0;
     }
