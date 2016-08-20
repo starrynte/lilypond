@@ -25,12 +25,14 @@
 #include "pointer-group-interface.hh"
 #include "self-alignment-interface.hh"
 #include "spanner.hh"
+#include "spanner-engraver.hh"
 #include "stream-event.hh"
 #include "text-interface.hh"
 
 #include "translator.icc"
+#include <sstream>
 
-class Dynamic_engraver : public Engraver
+class Dynamic_engraver : public Spanner_engraver<Dynamic_engraver>
 {
   TRANSLATOR_DECLARATIONS (Dynamic_engraver);
   void acknowledge_note_column (Grob_info);
@@ -49,7 +51,6 @@ private:
   string get_spanner_type (Stream_event *ev);
 
   Drul_array<Stream_event *> accepted_spanevents_drul_;
-  Spanner *current_spanner_;
   Spanner *finished_spanner_;
 
   Item *script_;
@@ -73,6 +74,7 @@ void
 Dynamic_engraver::listen_absolute_dynamic (Stream_event *ev)
 {
   ASSIGN_EVENT_ONCE (script_event_, ev);
+  take_spanner (ev->get_property ("spanner-share-context"), ev->get_property ("spanner-id"));
 }
 
 void
@@ -81,13 +83,15 @@ Dynamic_engraver::listen_span_dynamic (Stream_event *ev)
   Direction d = to_dir (ev->get_property ("span-direction"));
 
   ASSIGN_EVENT_ONCE (accepted_spanevents_drul_[d], ev);
+  take_spanner (ev->get_property ("spanner-share-context"), ev->get_property ("spanner-id"));
 }
 
 void
-Dynamic_engraver::listen_break_span (Stream_event *event)
+Dynamic_engraver::listen_break_span (Stream_event *ev)
 {
-  if (event->in_event_class ("break-dynamic-span-event"))
+  if (ev->in_event_class ("break-dynamic-span-event"))
     {
+      take_spanner (ev->get_property ("spanner-share-context"), ev->get_property ("spanner-id"));
       // Case 1: Already have a start dynamic event -> break applies to new
       //         spanner (created later) -> set a flag
       // Case 2: no new spanner, but spanner already active -> break it now
@@ -112,6 +116,10 @@ Dynamic_engraver::get_property_setting (Stream_event *evt,
 void
 Dynamic_engraver::process_music ()
 {
+  debug_output (string ("current span? ") + (current_spanner_ ? "YES" : "NO"));
+  debug_output (string ("start event? ") + (accepted_spanevents_drul_[START] ? "YES" : "NO"));
+  debug_output (string ("stop event? ") + (accepted_spanevents_drul_[STOP] ? "YES" : "NO"));
+  debug_output (string ("script event? ") + (script_event_ ? "YES" : "NO"));
   if (current_spanner_
       && (accepted_spanevents_drul_[STOP]
           || script_event_
@@ -124,8 +132,9 @@ Dynamic_engraver::process_music ()
       if (!ender)
         ender = accepted_spanevents_drul_[START];
 
+      take_spanner (ender->get_property ("spanner-share-context"), ender->get_property ("spanner-id"));
       finished_spanner_ = current_spanner_;
-      announce_end_grob (finished_spanner_, ender->self_scm ());
+      end_spanner (current_spanner_, ender->self_scm ());
       current_spanner_ = 0;
       current_span_event_ = 0;
     }
@@ -141,8 +150,10 @@ Dynamic_engraver::process_music ()
       if (scm_is_eq (cresc_type, ly_symbol2scm ("text")))
         {
           current_spanner_
-            = make_spanner ("DynamicTextSpanner",
-                            accepted_spanevents_drul_[START]->self_scm ());
+            = make_multi_spanner ("DynamicTextSpanner",
+                                  accepted_spanevents_drul_[START]->self_scm (),
+                                  accepted_spanevents_drul_[START]->get_property ("spanner-share-context"),
+                                  accepted_spanevents_drul_[START]->get_property ("spanner-id"));
 
           SCM text = get_property_setting (current_span_event_, "span-text",
                                            (start_type + "Text").c_str ());
@@ -165,8 +176,14 @@ Dynamic_engraver::process_music ()
               current_span_event_
               ->origin ()->warning (_f ("unknown crescendo style: %s\ndefaulting to hairpin.", as_string.c_str ()));
             }
-          current_spanner_ = make_spanner ("Hairpin",
-                                           current_span_event_->self_scm ());
+          current_spanner_
+            = make_multi_spanner ("Hairpin",
+                                  accepted_spanevents_drul_[START]->self_scm (),
+                                  accepted_spanevents_drul_[START]->get_property ("spanner-share-context"),
+                                  accepted_spanevents_drul_[START]->get_property ("spanner-id"));
+          ostringstream oss;
+          oss << "made new spanner " << current_spanner_;
+          debug_output (oss.str ());
         }
       // if we have a break-dynamic-span event right after the start dynamic, break the new spanner immediately
       if (end_new_spanner_)
@@ -189,9 +206,12 @@ Dynamic_engraver::process_music ()
 
   if (script_event_)
     {
+      // TODO make_multi_item?
       script_ = make_item ("DynamicText", script_event_->self_scm ());
       script_->set_property ("text",
                              script_event_->get_property ("text"));
+      script_->set_property ("spanner-id", script_event_->get_property ("spanner-id"));
+      script_->set_property ("spanner-share-context", script_event_->get_property ("spanner-share-context"));
 
       if (finished_spanner_)
         finished_spanner_->set_bound (RIGHT, script_);
@@ -278,9 +298,9 @@ Dynamic_engraver::acknowledge_note_column (Grob_info info)
 void
 Dynamic_engraver::boot ()
 {
-  ADD_LISTENER (Dynamic_engraver, absolute_dynamic);
-  ADD_LISTENER (Dynamic_engraver, span_dynamic);
-  ADD_LISTENER (Dynamic_engraver, break_span);
+  ADD_FILTERED_LISTENER (Dynamic_engraver, absolute_dynamic);
+  ADD_FILTERED_LISTENER (Dynamic_engraver, span_dynamic);
+  ADD_FILTERED_LISTENER (Dynamic_engraver, break_span);
   ADD_ACKNOWLEDGER (Dynamic_engraver, note_column);
 }
 
