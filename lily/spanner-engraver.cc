@@ -28,7 +28,7 @@ void Spanner_engraver::initialize ()
 
 Spanner *
 Spanner_engraver::internal_make_multi_spanner (SCM x, SCM cause, SCM share, SCM id,
-                                      char const *file, int line, char const *fun)
+                                               char const *file, int line, char const *fun)
 {
   Spanner *span = internal_make_spanner (x, cause, file, line, fun);
   span->set_property ("spanner-id", id);

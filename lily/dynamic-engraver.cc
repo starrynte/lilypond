@@ -176,8 +176,8 @@ Dynamic_engraver::process_music ()
                                   current_span_event_->get_property ("spanner-id"));
         }
       current_spanner_
-        ->set_property ("warn-unterminated",
-                        ly_symbol2scm (get_spanner_type (current_span_event_).c_str ()));
+      ->set_property ("warn-unterminated",
+                      ly_symbol2scm (get_spanner_type (current_span_event_).c_str ()));
       // if we have a break-dynamic-span event right after the start dynamic, break the new spanner immediately
       if (end_new_spanner_)
         {

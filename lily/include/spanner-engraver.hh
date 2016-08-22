@@ -155,7 +155,7 @@ Spanner_engraver::spanner_single_listen (Stream_event *ev)
 template <class T, class ParameterType>
 void
 Spanner_engraver::call_spanner_filtered (SCM share_context, SCM spanner_id,
-                                         void (T::*callback)(ParameterType), ParameterType argument)
+                                         void (T::*callback) (ParameterType), ParameterType argument)
 {
   T *instance = create_instance<T> (share_context, spanner_id, false);
   if (instance)
@@ -175,7 +175,6 @@ Spanner_engraver::call_spanner_filtered (SCM share_context, SCM spanner_id,
       instances = scm_cdr (instances);
     }
 }
-
 
 template <class T>
 T *
@@ -236,8 +235,8 @@ Spanner_engraver::create_instance (SCM share_context, SCM id, bool multiple)
     }
 
   instances = scm_is_pair (instances)
-    ? scm_cons (instance_scm, instances)
-    : scm_list_1 (instance_scm);
+              ? scm_cons (instance_scm, instances)
+              : scm_list_1 (instance_scm);
   context ()->set_property ("spannerEngravers", scm_assoc_set_x (spanner_engravers, key, instances));
 
   return instance;
