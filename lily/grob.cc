@@ -828,6 +828,8 @@ ADD_INTERFACE (Grob,
                "pure-Y-offset-in-progress "
                "rotation "
                "skyline-horizontal-padding "
+               "spanner-id "
+               "spanner-share-context "
                "springs-and-rods "
                "staff-symbol "
                "stencil "

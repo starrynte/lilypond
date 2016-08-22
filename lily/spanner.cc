@@ -559,10 +559,10 @@ ADD_INTERFACE (Spanner,
                " point of the spanner.",
 
                /* properties */
+               "current-engraver "
                "normalized-endpoints "
                "minimum-length "
                "minimum-length-after-break "
                "spanner-broken "
-               "spanner-id "
                "to-barline "
               );

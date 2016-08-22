@@ -34,6 +34,7 @@ public:
   SCM static create (SCM trans_list,
                      SCM iface_list, Direction);
 
+  friend class Spanner_engraver;
 };
 
 #endif /* TRANSLATOR_DISPATCH_LIST_HH */

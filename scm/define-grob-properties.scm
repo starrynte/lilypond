@@ -993,6 +993,8 @@ override:
   #'spacing-pair = #'(staff-bar . staff-bar)
 @end example")
      (spanner-id ,key? "An identifier to distinguish concurrent spanners.")
+     (spanner-share-context ,symbol? "Context within which this object
+may exist.")
      (springs-and-rods ,boolean? "Dummy variable for triggering
 spacing routines.")
      (stacking-dir ,ly:dir? "Stack objects in which direction?")
@@ -1377,6 +1379,8 @@ Grobs that are positioned around such beams are also @code{cross-staff}.
 Grobs that are grouping objects, however, like @code{VerticalAxisGroups}
 will not in general be marked @code{cross-staff} when some of the members
 of the group are @code{cross-staff}.")
+     (current-engraver ,ly:translator? "Engraver instance currently responsible
+for this grob. Used for cross-voice spanners.")
 
      (delta-position ,number? "The vertical position difference.")
 
