@@ -565,4 +565,5 @@ ADD_INTERFACE (Spanner,
                "minimum-length-after-break "
                "spanner-broken "
                "to-barline "
+               "warn-unterminated "
               );

@@ -1149,6 +1149,10 @@ one below this grob.")
 ;;;
 ;;; w
 ;;;
+     (warn-unterminated ,boolean-or-symbol? "If this is @code{#f}, no warning
+is issued if this spanner is unterminated. If this is a symbol, this property
+is used in the warning message (i.e. \"unterminated ___\"). Otherwise, the
+default grob name is used.")
      (when ,ly:moment? "Global time step associated with this column.")
      (whiteout ,boolean-or-number? "If a number or true, the grob is
 printed over a white background to white-out underlying material, if
