@@ -210,29 +210,11 @@ Spanner_engraver::create_instance (SCM share_context, SCM id, bool multiple)
         group->precomputed_method_bindings_[i].push_back (Method_instance (ptrs[i], instance));
     }
 
-  // Add to Engraver_group::acknowledge_hash_table_drul
+  // It might be faster to just clear Engraver_group::acknowledge_hash_table_drul_
+  // instead of checking to add a Method_instance for each grob
   Engraver_group *egroup = static_cast<Engraver_group *> (group);
-  for (LEFT_and_RIGHT (d))
-    {
-      Scheme_hash_table *table = unsmob<Scheme_hash_table> (T::acknowledge_static_array_drul_[d]);
-      // Skip if there are no acknowledgers in this direction
-      if (!table)
-        continue;
-      SCM interfaces = table->to_alist ();
-      while (scm_is_pair (interfaces))
-        {
-          SCM name = scm_caar (interfaces);
-          SCM ptr = scm_cdar (interfaces);
-          SCM acklist_scm = scm_hashq_ref (egroup->acknowledge_hash_table_drul_[d], name, SCM_BOOL_F);
-          if (!scm_is_false (acklist_scm))
-            {
-              Engraver_dispatch_list *acklist = unsmob<Engraver_dispatch_list> (acklist_scm);
-              acklist->dispatch_entries_.push_back (Method_instance (ptr, this));
-            }
-
-          interfaces = scm_cdr (interfaces);
-        }
-    }
+  egroup->acknowledge_hash_table_drul_[START] = scm_c_make_hash_table (61);
+  egroup->acknowledge_hash_table_drul_[STOP] = scm_c_make_hash_table (61);
 
   instances = scm_is_pair (instances)
               ? scm_cons (instance_scm, instances)
